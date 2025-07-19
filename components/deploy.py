@@ -7,10 +7,9 @@ import json
 def deploy(
     project_id: str,
     region: str,
-    vision_model: Input[Artifact],
-    tabular_model: Input[Artifact],
-    endpoint: Output[Artifact]
-) -> None:
+    vision_model: dict,
+    tabular_model: dict
+) -> dict:
     """Deploy trained models to endpoints.
     
     Args:
@@ -25,13 +24,9 @@ def deploy(
     # Initialize Vertex AI
     aiplatform.init(project=project_id, location=region)
 
-    # Load model info
-    with open(vision_model.path, 'r') as f:
-        vision_model_info = json.load(f)
-    
     # Deploy vision model
     vision_endpoint = aiplatform.Endpoint.create(display_name="crop-vision-endpoint")
-    vision_model_obj = aiplatform.Model(vision_model_info['resource_name'])
+    vision_model_obj = aiplatform.Model(vision_model['model'])
     vision_deploy = vision_model_obj.deploy(
         endpoint=vision_endpoint,
         machine_type="n1-standard-4",
@@ -39,13 +34,9 @@ def deploy(
         max_replica_count=3
     )
 
-    # Load model info
-    with open(tabular_model.path, 'r') as f:
-        tabular_model_info = json.load(f)
-    
     # Deploy tabular model
     tabular_endpoint = aiplatform.Endpoint.create(display_name="crop-tabular-endpoint")
-    tabular_model_obj = aiplatform.Model(tabular_model_info['resource_name'])
+    tabular_model_obj = aiplatform.Model(tabular_model['model'])
     tabular_deploy = tabular_model_obj.deploy(
         endpoint=tabular_endpoint,
         machine_type="n1-standard-4",
@@ -53,11 +44,7 @@ def deploy(
         max_replica_count=3
     )
 
-    # Save endpoint info
-    endpoint_info = {
+    return {
         'vision_endpoint': vision_endpoint.resource_name,
         'tabular_endpoint': tabular_endpoint.resource_name
     }
-    
-    with open(endpoint.path, 'w') as f:
-        json.dump(endpoint_info, f)

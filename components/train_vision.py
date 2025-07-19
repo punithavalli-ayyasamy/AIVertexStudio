@@ -7,10 +7,9 @@ import json
 def train_vision(
     project_id: str,
     region: str,
-    dataset: Input[Artifact],
-    min_accuracy: float,
-    model: Output[Artifact]
-) -> None:
+    dataset: str,
+    min_accuracy: float
+) -> dict:
     """Train AutoML Vision model for crop analysis.
     
     Args:
@@ -28,7 +27,7 @@ def train_vision(
     # Create dataset
     ai_dataset = aiplatform.ImageDataset.create(
         display_name="crop_vision_dataset",
-        gcs_source=dataset.path,
+        gcs_source=dataset,
         import_schema_uri=aiplatform.schema.dataset.ioformat.image.single_label_classification
     )
 
@@ -53,11 +52,7 @@ def train_vision(
     if eval_metrics.metrics['auRoc'] < min_accuracy:
         raise ValueError(f"Model accuracy {eval_metrics.metrics['auRoc']} below threshold {min_accuracy}")
 
-    # Save model info
-    model_info = {
-        'resource_name': ai_model.resource_name,
+    return {
+        'model': ai_model.resource_name,
         'accuracy': float(eval_metrics.metrics['auRoc'])
     }
-    
-    with open(model.path, 'w') as f:
-        json.dump(model_info, f)

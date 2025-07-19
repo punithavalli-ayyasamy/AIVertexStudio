@@ -7,10 +7,9 @@ import json
 def train_tabular(
     project_id: str,
     region: str,
-    dataset: Input[Artifact],
-    min_accuracy: float,
-    model: Output[Artifact]
-) -> None:
+    dataset: str,
+    min_accuracy: float
+) -> dict:
     """Train AutoML Tabular model for crop yield prediction.
     
     Args:
@@ -28,7 +27,7 @@ def train_tabular(
     # Create dataset
     ai_dataset = aiplatform.TabularDataset.create(
         display_name="crop_tabular_dataset",
-        gcs_source=dataset.path
+        gcs_source=dataset
     )
 
     # Train model
@@ -53,11 +52,7 @@ def train_tabular(
     if eval_metrics.metrics['rmse'] > min_accuracy:
         raise ValueError(f"Model RMSE {eval_metrics.metrics['rmse']} above threshold {min_accuracy}")
 
-    # Save model info
-    model_info = {
-        'resource_name': ai_model.resource_name,
+    return {
+        'model': ai_model.resource_name,
         'rmse': float(eval_metrics.metrics['rmse'])
     }
-    
-    with open(model.path, 'w') as f:
-        json.dump(model_info, f)

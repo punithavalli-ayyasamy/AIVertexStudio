@@ -11,10 +11,8 @@ import os
 def preprocess(
     vision_data: str,
     tabular_data: str,
-    bucket_name: str,
-    vision_dataset: Output[Artifact],
-    tabular_dataset: Output[Artifact]
-) -> None:
+    bucket_name: str
+) -> dict:
     """Preprocess vision and tabular data for training.
     
     Args:
@@ -49,15 +47,20 @@ def preprocess(
         return df
 
     # Process and save datasets
-    vision_output_path = vision_dataset.path
-    tabular_output_path = tabular_dataset.path
+    vision_output_uri = f"gs://{bucket_name}/processed/vision_data.csv"
+    tabular_output_uri = f"gs://{bucket_name}/processed/tabular_data.csv"
     
-    os.makedirs(os.path.dirname(vision_output_path), exist_ok=True)
-    os.makedirs(os.path.dirname(tabular_output_path), exist_ok=True)
+    # Upload processed data to GCS
+    bucket = storage_client.bucket(bucket_name)
     
-    # Write processed data to output paths
-    with open(vision_output_path, 'w') as f:
-        f.write(f"Processed vision data from {vision_data}")
-        
-    with open(tabular_output_path, 'w') as f:
-        f.write(f"Processed tabular data from {tabular_data}")
+    # For demo, just write placeholder data
+    vision_blob = bucket.blob('processed/vision_data.csv')
+    vision_blob.upload_from_string(f"Processed vision data from {vision_data}")
+    
+    tabular_blob = bucket.blob('processed/tabular_data.csv')
+    tabular_blob.upload_from_string(f"Processed tabular data from {tabular_data}")
+    
+    return {
+        'vision_dataset': vision_output_uri,
+        'tabular_dataset': tabular_output_uri
+    }
