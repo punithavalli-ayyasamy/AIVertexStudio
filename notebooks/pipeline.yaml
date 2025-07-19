@@ -91,22 +91,21 @@ deploymentSpec:
         command:
         - python3
         - -c
-        - "import sys\nimport argparse\nimport json\nfrom google.cloud import aiplatform\n\
-          \nparser = argparse.ArgumentParser()\nparser.add_argument('--project_id')\n\
-          parser.add_argument('--region')\nparser.add_argument('--vision_model')\n\
-          parser.add_argument('--tabular_model')\nargs = parser.parse_args()\n\n#\
-          \ Parse model information from JSON strings\nvision_model_info = json.loads(args.vision_model)\n\
-          tabular_model_info = json.loads(args.tabular_model)\n\n# Initialize Vertex\
-          \ AI\naiplatform.init(project=args.project_id, location=args.region)\n\n\
-          # Deploy vision model\nvision_endpoint = aiplatform.Endpoint.create(display_name=\"\
-          crop-vision-endpoint\")\nvision_model_obj = aiplatform.Model(vision_model_info['model'])\n\
-          vision_deploy = vision_model_obj.deploy(\n    endpoint=vision_endpoint,\n\
-          \    machine_type=\"n1-standard-4\",\n    min_replica_count=1,\n    max_replica_count=3\n\
-          )\n\n# Deploy tabular model\ntabular_endpoint = aiplatform.Endpoint.create(display_name=\"\
-          crop-tabular-endpoint\")\ntabular_model_obj = aiplatform.Model(tabular_model_info['model'])\n\
-          tabular_deploy = tabular_model_obj.deploy(\n    endpoint=tabular_endpoint,\n\
-          \    machine_type=\"n1-standard-4\",\n    min_replica_count=1,\n    max_replica_count=3\n\
-          )\n\n# Print outputs for KFP\nprint(vision_endpoint.resource_name)\nprint(tabular_endpoint.resource_name)\n"
+        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
+          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
+          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
+          \ type=str, required=True)\nparser.add_argument('--vision_model', type=str,\
+          \ required=True)\nparser.add_argument('--tabular_model', type=str, required=True)\n\
+          args = parser.parse_args()\n\n# Parse model information from JSON strings\n\
+          vision_model_info = json.loads(args.vision_model)\ntabular_model_info =\
+          \ json.loads(args.tabular_model)\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
+          \ location=args.region)\n\n# Deploy vision model\nvision_model_resource\
+          \ = aiplatform.Model(vision_model_info['model'])\nvision_endpoint = vision_model_resource.deploy(\n\
+          \    machine_type='n1-standard-4',\n    min_replica_count=1,\n    max_replica_count=1\n\
+          )\n\n# Deploy tabular model\ntabular_model_resource = aiplatform.Model(tabular_model_info['model'])\n\
+          tabular_endpoint = tabular_model_resource.deploy(\n    machine_type='n1-standard-4',\n\
+          \    min_replica_count=1,\n    max_replica_count=1\n)\n\n# Print outputs\
+          \ for KFP\nprint(vision_endpoint.resource_name)\nprint(tabular_endpoint.resource_name)\n"
         image: python:3.9
     exec-preprocess:
       container:
@@ -120,11 +119,14 @@ deploymentSpec:
         command:
         - python3
         - -c
-        - "import sys\nimport argparse\nfrom google.cloud import storage\nfrom PIL\
-          \ import Image\nimport io\nimport numpy as np\nimport pandas as pd\n\nparser\
-          \ = argparse.ArgumentParser()\nparser.add_argument('--vision_data')\nparser.add_argument('--tabular_data')\n\
-          parser.add_argument('--bucket_name')\nargs = parser.parse_args()\n\n# Initialize\
-          \ GCS client\nstorage_client = storage.Client()\nbucket = storage_client.bucket(args.bucket_name)\n\
+        - "import os\nimport sys\nimport argparse\nfrom google.cloud import storage\n\
+          from PIL import Image\nimport io\nimport numpy as np\nimport pandas as pd\n\
+          \n# Parse command line arguments\nparser = argparse.ArgumentParser()\nparser.add_argument('--vision_data',\
+          \ type=str, required=True)\nparser.add_argument('--tabular_data', type=str,\
+          \ required=True)\nparser.add_argument('--bucket_name', type=str, required=True)\n\
+          args = parser.parse_args()\n\n# Get parameters from arguments\nvision_data\
+          \ = args.vision_data\ntabular_data = args.tabular_data\nbucket_name = args.bucket_name\n\
+          \n# Initialize GCS client\nstorage_client = storage.Client()\nbucket = storage_client.bucket(bucket_name)\n\
           \n# Process vision data\ndef process_image(image_bytes):\n    img = Image.open(io.BytesIO(image_bytes))\n\
           \    img = img.resize((224, 224))  # Standard size for many vision models\n\
           \    return np.array(img)\n\n# Process tabular data\ndef process_tabular(df):\n\
@@ -133,13 +135,10 @@ deploymentSpec:
           \ df[\"planting_date\"] = pd.to_datetime(df[\"planting_date\"])\n      \
           \  df[\"planting_month\"] = df[\"planting_date\"].dt.month\n        df[\"\
           planting_day\"] = df[\"planting_date\"].dt.day\n    \n    return df\n\n\
-          # Process and save datasets\nvision_output_uri = f\"gs://{args.bucket_name}/processed/vision_data.csv\"\
-          \ntabular_output_uri = f\"gs://{args.bucket_name}/processed/tabular_data.csv\"\
-          \n\n# For demo, just write placeholder data\nvision_blob = bucket.blob(\"\
-          processed/vision_data.csv\")\nvision_blob.upload_from_string(f\"Processed\
-          \ vision data from {args.vision_data}\")\n\ntabular_blob = bucket.blob(\"\
-          processed/tabular_data.csv\")\ntabular_blob.upload_from_string(f\"Processed\
-          \ tabular data from {args.tabular_data}\")\n\nprint(vision_output_uri)\n\
+          # Process and save datasets\nvision_blob = bucket.blob('processed_vision_data.txt')\n\
+          vision_blob.upload_from_string(vision_data)\nvision_output_uri = f\"gs://{bucket_name}/{vision_blob.name}\"\
+          \n\ntabular_blob = bucket.blob('processed_tabular_data.csv')\ntabular_blob.upload_from_string(tabular_data)\n\
+          tabular_output_uri = f\"gs://{bucket_name}/{tabular_blob.name}\"\n\nprint(vision_output_uri)\n\
           print(tabular_output_uri)\n"
         image: python:3.9
     exec-train-tabular:
@@ -156,23 +155,34 @@ deploymentSpec:
         command:
         - python3
         - -c
-        - "import sys\nimport argparse\nfrom google.cloud import aiplatform\n\nparser\
-          \ = argparse.ArgumentParser()\nparser.add_argument('--project_id')\nparser.add_argument('--region')\n\
-          parser.add_argument('--dataset')\nparser.add_argument('--min_accuracy',\
-          \ type=float)\nargs = parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
+        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
+          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
+          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
+          \ type=str, required=True)\nparser.add_argument('--dataset', type=str, required=True)\n\
+          parser.add_argument('--min_accuracy', type=float, required=True)\nargs =\
+          \ parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
           \ location=args.region)\n\n# Create dataset\nai_dataset = aiplatform.TabularDataset.create(\n\
           \    display_name=\"crop_tabular_dataset\",\n    gcs_source=args.dataset\n\
           )\n\n# Train model\njob = aiplatform.AutoMLTabularTrainingJob(\n    display_name=\"\
-          crop_tabular_model\",\n    optimization_prediction_type=\"regression\",\n\
-          \    optimization_objective=\"minimize-rmse\"\n)\n\nai_model = job.run(\n\
-          \    dataset=ai_dataset,\n    target_column=\"yield\",\n    budget_milli_node_hours=83.33,\
-          \  # 5 minutes\n    model_display_name=\"crop_tabular_model\",\n    training_fraction_split=0.8,\n\
-          \    validation_fraction_split=0.1,\n    test_fraction_split=0.1\n)\n\n\
-          # Evaluate model\neval_metrics = ai_model.get_model_evaluation()\nif eval_metrics.metrics['rmse']\
-          \ > args.min_accuracy:\n    raise ValueError(f\"Model RMSE {eval_metrics.metrics['rmse']}\
-          \ above threshold {args.min_accuracy}\")\n\n# Print output as JSON for KFP\n\
-          import json\nmodel_info = {\n    'model': ai_model.resource_name,\n    'rmse':\
-          \ float(eval_metrics.metrics['rmse'])\n}\nprint(json.dumps(model_info))\n"
+          crop_tabular_model\",\n    optimization_objective=\"minimize-rmse\",\n \
+          \   column_transformations=[\n        {\"numeric\": {\"column_name\": \"\
+          field_size\"}},\n        {\"numeric\": {\"column_name\": \"rainfall\"}},\n\
+          \        {\"numeric\": {\"column_name\": \"temperature\"}},\n        {\"\
+          categorical\": {\"column_name\": \"location\"}},\n        {\"categorical\"\
+          : {\"column_name\": \"crop_type\"}},\n        {\"timestamp\": {\"column_name\"\
+          : \"date\"}}\n    ],\n    target_column=\"yield\",\n    budget_milli_node_hours=83,\
+          \  # Approximately 5 minutes (83 milli-node hours)\n    optimization_prediction_type=\"\
+          regression\",\n    additional_experiments=[\"enable_model_compression\"\
+          ]  # Optional: Enable model compression\n)\n\n# Run the training job\nai_model\
+          \ = job.run(\n    dataset=ai_dataset,\n    model_display_name=\"crop_yield_model\"\
+          ,\n    training_fraction_split=0.8,\n    validation_fraction_split=0.1,\n\
+          \    test_fraction_split=0.1\n)\n\n# Get model evaluation\neval_metrics\
+          \ = ai_model.list_model_evaluations()[0]\n\n# Check if model meets accuracy\
+          \ threshold\nif eval_metrics.metrics['rmse'] > args.min_accuracy:\n    raise\
+          \ ValueError(f\"Model RMSE {eval_metrics.metrics['rmse']} above threshold\
+          \ {args.min_accuracy}\")\n\n# Print output as JSON for KFP\nmodel_info =\
+          \ {\n    'model': ai_model.resource_name,\n    'rmse': float(eval_metrics.metrics['rmse'])\n\
+          }\nprint(json.dumps(model_info))\n"
         image: python:3.9
     exec-train-vision:
       container:
@@ -188,23 +198,27 @@ deploymentSpec:
         command:
         - python3
         - -c
-        - "import sys\nimport argparse\nfrom google.cloud import aiplatform\n\nparser\
-          \ = argparse.ArgumentParser()\nparser.add_argument('--project_id')\nparser.add_argument('--region')\n\
-          parser.add_argument('--dataset')\nparser.add_argument('--min_accuracy',\
-          \ type=float)\nargs = parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
+        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
+          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
+          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
+          \ type=str, required=True)\nparser.add_argument('--dataset', type=str, required=True)\n\
+          parser.add_argument('--min_accuracy', type=float, required=True)\nargs =\
+          \ parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
           \ location=args.region)\n\n# Create dataset\nai_dataset = aiplatform.ImageDataset.create(\n\
-          \    display_name=\"crop_vision_dataset\",\n    gcs_source=args.dataset,\n\
-          \    import_schema_uri=aiplatform.schema.dataset.ioformat.image.single_label_classification\n\
+          \    display_name=\"crop_vision_dataset\",\n    gcs_source=args.dataset\n\
           )\n\n# Train model\njob = aiplatform.AutoMLImageTrainingJob(\n    display_name=\"\
-          crop_vision_model\",\n    prediction_type=\"image_classification\"\n)\n\n\
-          ai_model = job.run(\n    dataset=ai_dataset,\n    target_column=\"yield\"\
-          ,\n    budget_milli_node_hours=83.33,  # 5 minutes\n    model_display_name=\"\
+          crop_vision_model\",\n    prediction_type=\"classification\",\n    budget_milli_node_hours=83,\
+          \  # Approximately 5 minutes (83 milli-node hours)\n    model_type=\"CLOUD\"\
+          ,\n    base_model=None\n)\n\n# Run the training job\nai_model = job.run(\n\
+          \    dataset=ai_dataset,\n    budget_milli_node_hours=83,  # 5 minutes for\
+          \ testing\n    training_filter_split=\"\",  # No filter\n    model_display_name=\"\
           crop_vision_model\",\n    training_fraction_split=0.8,\n    validation_fraction_split=0.1,\n\
-          \    test_fraction_split=0.1\n)\n\n# Evaluate model\neval_metrics = ai_model.get_model_evaluation()\n\
-          if eval_metrics.metrics['auRoc'] < args.min_accuracy:\n    raise ValueError(f\"\
-          Model accuracy {eval_metrics.metrics['auRoc']} below threshold {args.min_accuracy}\"\
-          )\n\n# Print output as JSON for KFP\nimport json\nmodel_info = {\n    'model':\
-          \ ai_model.resource_name,\n    'accuracy': float(eval_metrics.metrics['auRoc'])\n\
+          \    test_fraction_split=0.1\n)\n\n# Get model evaluation\neval_metrics\
+          \ = ai_model.list_model_evaluations()[0]\n\n# Check if model meets accuracy\
+          \ threshold\nif eval_metrics.metrics['auRoc'] < args.min_accuracy:\n   \
+          \ raise ValueError(f\"Model accuracy {eval_metrics.metrics['auRoc']} below\
+          \ threshold {args.min_accuracy}\")\n\n# Print output as JSON for KFP\nmodel_info\
+          \ = {\n    'model': ai_model.resource_name,\n    'accuracy': float(eval_metrics.metrics['auRoc'])\n\
           }\nprint(json.dumps(model_info))\n"
         image: python:3.9
 pipelineInfo:

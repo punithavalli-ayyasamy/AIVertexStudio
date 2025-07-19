@@ -23,25 +23,21 @@ implementation:
       from google.cloud import aiplatform
       import json
 
-      import sys
-      import argparse
-      from google.cloud import aiplatform
-
-      import os
-      
-      # Get parameters from environment variables
-      project_id = os.environ['PROJECT_ID']
-      region = os.environ['REGION']
-      dataset = os.environ['DATASET']
-      min_accuracy = float(os.environ['MIN_ACCURACY'])
+      # Parse command line arguments
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--project_id', type=str, required=True)
+      parser.add_argument('--region', type=str, required=True)
+      parser.add_argument('--dataset', type=str, required=True)
+      parser.add_argument('--min_accuracy', type=float, required=True)
+      args = parser.parse_args()
 
       # Initialize Vertex AI
-      aiplatform.init(project=project_id, location=region)
+      aiplatform.init(project=args.project_id, location=args.region)
 
       # Create dataset
       ai_dataset = aiplatform.TabularDataset.create(
           display_name="crop_tabular_dataset",
-          gcs_source=dataset
+          gcs_source=args.dataset
       )
 
       # Train model
@@ -56,7 +52,10 @@ implementation:
               {"categorical": {"column_name": "crop_type"}},
               {"timestamp": {"column_name": "date"}}
           ],
-          target_column="yield"
+          target_column="yield",
+          budget_milli_node_hours=83,  # Approximately 5 minutes (83 milli-node hours)
+          optimization_prediction_type="regression",
+          additional_experiments=["enable_model_compression"]  # Optional: Enable model compression
       )
 
       # Run the training job
@@ -72,17 +71,15 @@ implementation:
       eval_metrics = ai_model.list_model_evaluations()[0]
 
       # Check if model meets accuracy threshold
-      if eval_metrics.metrics['rmse'] > min_accuracy:
-          raise ValueError(f"Model RMSE {eval_metrics.metrics['rmse']} above threshold {min_accuracy}")
+      if eval_metrics.metrics['rmse'] > args.min_accuracy:
+          raise ValueError(f"Model RMSE {eval_metrics.metrics['rmse']} above threshold {args.min_accuracy}")
 
       # Print output as JSON for KFP
-      import json
       model_info = {
           'model': ai_model.resource_name,
           'rmse': float(eval_metrics.metrics['rmse'])
       }
       print(json.dumps(model_info))
-      '
     args:
     - --project_id
     - {inputValue: project_id}

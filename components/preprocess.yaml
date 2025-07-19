@@ -26,20 +26,17 @@ implementation:
       import numpy as np
       import pandas as pd
 
-      import sys
-      import argparse
-      from google.cloud import storage
-      from PIL import Image
-      import io
-      import numpy as np
-      import pandas as pd
+      # Parse command line arguments
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--vision_data', type=str, required=True)
+      parser.add_argument('--tabular_data', type=str, required=True)
+      parser.add_argument('--bucket_name', type=str, required=True)
+      args = parser.parse_args()
 
-      import os
-      
-      # Get parameters from environment variables
-      vision_data = os.environ['VISION_DATA']
-      tabular_data = os.environ['TABULAR_DATA']
-      bucket_name = os.environ['BUCKET_NAME']
+      # Get parameters from arguments
+      vision_data = args.vision_data
+      tabular_data = args.tabular_data
+      bucket_name = args.bucket_name
 
       # Initialize GCS client
       storage_client = storage.Client()
@@ -75,7 +72,6 @@ implementation:
 
       print(vision_output_uri)
       print(tabular_output_uri)
-      '
     args:
     - --vision_data
     - {inputValue: vision_data}

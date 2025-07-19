@@ -24,25 +24,20 @@ implementation:
       from google.cloud import aiplatform
       import json
 
-      import sys
-      import argparse
-      import json
-      from google.cloud import aiplatform
-
-      import os
-      
-      # Get parameters from environment variables
-      project_id = os.environ['PROJECT_ID']
-      region = os.environ['REGION']
-      vision_model_info = json.loads(os.environ['VISION_MODEL'])
-      tabular_model_info = json.loads(os.environ['TABULAR_MODEL'])
+      # Parse command line arguments
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--project_id', type=str, required=True)
+      parser.add_argument('--region', type=str, required=True)
+      parser.add_argument('--vision_model', type=str, required=True)
+      parser.add_argument('--tabular_model', type=str, required=True)
+      args = parser.parse_args()
 
       # Parse model information from JSON strings
-      vision_model_info = json.loads(os.environ['VISION_MODEL'])
-      tabular_model_info = json.loads(os.environ['TABULAR_MODEL'])
+      vision_model_info = json.loads(args.vision_model)
+      tabular_model_info = json.loads(args.tabular_model)
 
       # Initialize Vertex AI
-      aiplatform.init(project=project_id, location=region)
+      aiplatform.init(project=args.project_id, location=args.region)
 
       # Deploy vision model
       vision_model_resource = aiplatform.Model(vision_model_info['model'])
@@ -63,7 +58,6 @@ implementation:
       # Print outputs for KFP
       print(vision_endpoint.resource_name)
       print(tabular_endpoint.resource_name)
-      '
     args:
     - --project_id
     - {inputValue: project_id}

@@ -23,36 +23,37 @@ implementation:
       from google.cloud import aiplatform
       import json
 
-      import sys
-      import argparse
-      from google.cloud import aiplatform
-
-      import os
-      
-      # Get parameters from environment variables
-      project_id = os.environ['PROJECT_ID']
-      region = os.environ['REGION']
-      dataset = os.environ['DATASET']
-      min_accuracy = float(os.environ['MIN_ACCURACY'])
+      # Parse command line arguments
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--project_id', type=str, required=True)
+      parser.add_argument('--region', type=str, required=True)
+      parser.add_argument('--dataset', type=str, required=True)
+      parser.add_argument('--min_accuracy', type=float, required=True)
+      args = parser.parse_args()
 
       # Initialize Vertex AI
-      aiplatform.init(project=project_id, location=region)
+      aiplatform.init(project=args.project_id, location=args.region)
 
       # Create dataset
       ai_dataset = aiplatform.ImageDataset.create(
           display_name="crop_vision_dataset",
-          gcs_source=dataset
+          gcs_source=args.dataset
       )
 
       # Train model
       job = aiplatform.AutoMLImageTrainingJob(
           display_name="crop_vision_model",
-          prediction_type="classification"
+          prediction_type="classification",
+          budget_milli_node_hours=83,  # Approximately 5 minutes (83 milli-node hours)
+          model_type="CLOUD",
+          base_model=None
       )
 
       # Run the training job
       ai_model = job.run(
           dataset=ai_dataset,
+          budget_milli_node_hours=83,  # 5 minutes for testing
+          training_filter_split="",  # No filter
           model_display_name="crop_vision_model",
           training_fraction_split=0.8,
           validation_fraction_split=0.1,
@@ -63,17 +64,15 @@ implementation:
       eval_metrics = ai_model.list_model_evaluations()[0]
 
       # Check if model meets accuracy threshold
-      if eval_metrics.metrics['auRoc'] < min_accuracy:
-          raise ValueError(f"Model accuracy {eval_metrics.metrics['auRoc']} below threshold {min_accuracy}")
+      if eval_metrics.metrics['auRoc'] < args.min_accuracy:
+          raise ValueError(f"Model accuracy {eval_metrics.metrics['auRoc']} below threshold {args.min_accuracy}")
 
       # Print output as JSON for KFP
-      import json
       model_info = {
           'model': ai_model.resource_name,
           'accuracy': float(eval_metrics.metrics['auRoc'])
       }
       print(json.dumps(model_info))
-      '
     args:
     - --project_id
     - {inputValue: project_id}
