@@ -15,8 +15,15 @@ implementation:
   container:
     image: python:3.9
     command:
-    - python3
+    - sh
     - -c
+    - |
+      python3 -m pip install --no-cache-dir \
+        google-cloud-aiplatform==1.25.0 \
+        google-cloud-storage==2.9.0 \
+        protobuf<4.0.0dev \
+        pydantic<3.0.0
+      python3 -c
     - |
       import os
       import sys

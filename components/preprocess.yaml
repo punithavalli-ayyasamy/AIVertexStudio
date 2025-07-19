@@ -14,8 +14,16 @@ implementation:
   container:
     image: python:3.9
     command:
-    - python3
+    - sh
     - -c
+    - |
+      python3 -m pip install --no-cache-dir \
+        google-cloud-storage==2.9.0 \
+        pandas==2.0.3 \
+        numpy==1.24.3 \
+        pillow==10.0.0 \
+        protobuf<4.0.0dev
+      python3 -c
     - |
       import os
       import sys
