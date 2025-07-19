@@ -34,52 +34,76 @@ implementation:
       import numpy as np
       import pandas as pd
 
-      # Parse command line arguments
-      parser = argparse.ArgumentParser()
-      parser.add_argument('--vision_data', type=str, required=True)
-      parser.add_argument('--tabular_data', type=str, required=True)
-      parser.add_argument('--bucket_name', type=str, required=True)
-      args = parser.parse_args()
+      try:
+          # Parse command line arguments
+          parser = argparse.ArgumentParser()
+          parser.add_argument('--vision_data', type=str, required=True)
+          parser.add_argument('--tabular_data', type=str, required=True)
+          parser.add_argument('--bucket_name', type=str, required=True)
+          args = parser.parse_args()
 
-      # Get parameters from arguments
-      vision_data = args.vision_data
-      tabular_data = args.tabular_data
-      bucket_name = args.bucket_name
+          # Get parameters from arguments
+          vision_data = args.vision_data
+          tabular_data = args.tabular_data
+          bucket_name = args.bucket_name
 
-      # Initialize GCS client
-      storage_client = storage.Client()
-      bucket = storage_client.bucket(bucket_name)
+          # Initialize GCS client
+          storage_client = storage.Client()
+          bucket = storage_client.bucket(bucket_name)
 
-      # Process vision data
-      def process_image(image_bytes):
-          img = Image.open(io.BytesIO(image_bytes))
-          img = img.resize((224, 224))  # Standard size for many vision models
-          return np.array(img)
+          # Process vision data
+          def process_image(image_bytes):
+              img = Image.open(io.BytesIO(image_bytes))
+              img = img.resize((224, 224))  # Standard size for many vision models
+              return np.array(img)
 
-      # Process tabular data
-      def process_tabular(df):
-          # Handle missing values
-          df = df.fillna(df.mean())
-          
-          # Feature engineering
+          # Process tabular data
+          # Download CSV from GCS if it's a GCS path
+          if tabular_data.startswith('gs://'):
+              blob = bucket.blob(tabular_data.replace(f'gs://{bucket_name}/', ''))
+              content = blob.download_as_string()
+              df = pd.read_csv(io.StringIO(content.decode('utf-8')))
+          else:
+              df = pd.read_csv(io.StringIO(tabular_data))
+
+          # Handle numeric columns
+          numeric_cols = df.select_dtypes(include=[np.number]).columns
+          df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+
+          # Handle categorical columns
+          categorical_cols = ['location', 'crop_type']
+          for col in categorical_cols:
+              if col in df.columns:
+                  df[col] = df[col].fillna('unknown')
+
+          # Process dates
           if "planting_date" in df.columns:
               df["planting_date"] = pd.to_datetime(df["planting_date"])
               df["planting_month"] = df["planting_date"].dt.month
               df["planting_day"] = df["planting_date"].dt.day
-          
-          return df
 
-      # Process and save datasets
-      vision_blob = bucket.blob('processed_vision_data.txt')
-      vision_blob.upload_from_string(vision_data)
-      vision_output_uri = f"gs://{bucket_name}/{vision_blob.name}"
+          # Process and save datasets
+          vision_blob = bucket.blob('processed_vision_data.txt')
+          vision_blob.upload_from_string(vision_data)
+          vision_output_uri = f"gs://{bucket_name}/{vision_blob.name}"
 
-      tabular_blob = bucket.blob('processed_tabular_data.csv')
-      tabular_blob.upload_from_string(tabular_data)
-      tabular_output_uri = f"gs://{bucket_name}/{tabular_blob.name}"
+          tabular_blob = bucket.blob('processed_tabular_data.csv')
+          tabular_blob.upload_from_string(df.to_csv(index=False), content_type='text/csv')
+          tabular_output_uri = f"gs://{bucket_name}/{tabular_blob.name}"
 
-      print(vision_output_uri)
-      print(tabular_output_uri)
+          print("✅ Preprocessing successful")
+          print(f"Vision dataset: {vision_output_uri}")
+          print(f"Tabular dataset: {tabular_output_uri}")
+          print("\nProcessed data info:")
+          print(df.info())
+
+          # Print URIs for pipeline
+          print(vision_output_uri)
+          print(tabular_output_uri)
+
+      except Exception as e:
+          print(f"❌ Preprocessing failed: {str(e)}")
+          raise
     args:
     - --vision_data
     - {inputValue: vision_data}
