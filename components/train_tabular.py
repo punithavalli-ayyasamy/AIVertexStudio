@@ -1,5 +1,6 @@
-from kfp.v2.dsl import component
+from kfp.v2.dsl import component, Input, Output, Dataset, Model
 from google.cloud import aiplatform
+import json
 
 @component(
     base_image='python:3.9',
@@ -8,9 +9,10 @@ from google.cloud import aiplatform
 def train_tabular(
     project_id: str,
     region: str,
-    dataset_uri: str,
-    min_accuracy: float
-) -> dict:
+    dataset: Input[Dataset],
+    min_accuracy: float,
+    model: Output[Model]
+):
     """Train AutoML Tabular model for crop yield prediction.
     
     Args:
@@ -26,9 +28,9 @@ def train_tabular(
     aiplatform.init(project=project_id, location=region)
 
     # Create dataset
-    dataset = aiplatform.TabularDataset.create(
+    ai_dataset = aiplatform.TabularDataset.create(
         display_name="crop_tabular_dataset",
-        gcs_source=dataset_uri
+        gcs_source=dataset.path
     )
 
     # Train model
@@ -38,8 +40,8 @@ def train_tabular(
         optimization_objective="minimize-rmse"
     )
 
-    model = job.run(
-        dataset=dataset,
+    ai_model = job.run(
+        dataset=ai_dataset,
         target_column="yield",
         budget_milli_node_hours=83.33,  # 5 minutes
         model_display_name="crop_tabular_model",
@@ -49,11 +51,15 @@ def train_tabular(
     )
 
     # Evaluate model
-    eval_metrics = model.get_model_evaluation()
+    eval_metrics = ai_model.get_model_evaluation()
     if eval_metrics.metrics['rmse'] > min_accuracy:
         raise ValueError(f"Model RMSE {eval_metrics.metrics['rmse']} above threshold {min_accuracy}")
 
-    return {
-        'model': model.resource_name,
+    # Save model info
+    model_info = {
+        'resource_name': ai_model.resource_name,
         'rmse': float(eval_metrics.metrics['rmse'])
     }
+    
+    with open(model.path, 'w') as f:
+        json.dump(model_info, f)

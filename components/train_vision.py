@@ -1,5 +1,6 @@
-from kfp.v2.dsl import component
+from kfp.v2.dsl import component, Input, Output, Dataset, Model
 from google.cloud import aiplatform
+import json
 
 @component(
     base_image='python:3.9',
@@ -8,9 +9,10 @@ from google.cloud import aiplatform
 def train_vision(
     project_id: str,
     region: str,
-    dataset_uri: str,
-    min_accuracy: float
-) -> dict:
+    dataset: Input[Dataset],
+    min_accuracy: float,
+    model: Output[Model]
+):
     """Train AutoML Vision model for crop analysis.
     
     Args:
@@ -26,9 +28,9 @@ def train_vision(
     aiplatform.init(project=project_id, location=region)
 
     # Create dataset
-    dataset = aiplatform.ImageDataset.create(
+    ai_dataset = aiplatform.ImageDataset.create(
         display_name="crop_vision_dataset",
-        gcs_source=dataset_uri,
+        gcs_source=dataset.path,
         import_schema_uri=aiplatform.schema.dataset.ioformat.image.single_label_classification
     )
 
@@ -38,8 +40,8 @@ def train_vision(
         prediction_type="image_classification"
     )
 
-    model = job.run(
-        dataset=dataset,
+    ai_model = job.run(
+        dataset=ai_dataset,
         target_column="yield",
         budget_milli_node_hours=83.33,  # 5 minutes
         model_display_name="crop_vision_model",
@@ -49,11 +51,15 @@ def train_vision(
     )
 
     # Evaluate model
-    eval_metrics = model.get_model_evaluation()
+    eval_metrics = ai_model.get_model_evaluation()
     if eval_metrics.metrics['auRoc'] < min_accuracy:
         raise ValueError(f"Model accuracy {eval_metrics.metrics['auRoc']} below threshold {min_accuracy}")
 
-    return {
-        'model': model.resource_name,
+    # Save model info
+    model_info = {
+        'resource_name': ai_model.resource_name,
         'accuracy': float(eval_metrics.metrics['auRoc'])
     }
+    
+    with open(model.path, 'w') as f:
+        json.dump(model_info, f)
