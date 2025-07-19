@@ -1,4 +1,5 @@
-from kfp.v2.dsl import component, Output, Dataset
+from kfp import dsl
+from kfp.dsl import component, Output, Dataset
 from google.cloud import storage
 import pandas as pd
 import numpy as np

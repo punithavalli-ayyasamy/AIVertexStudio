@@ -1,4 +1,5 @@
-from kfp.v2.dsl import component, Input, Output, Model, Artifact
+from kfp import dsl
+from kfp.dsl import component, Input, Output, Model, Artifact
 from google.cloud import aiplatform
 import json
 
