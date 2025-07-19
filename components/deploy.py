@@ -1,9 +1,6 @@
-from kfp import dsl
-from kfp.dsl import component, Input, Output, Model, Artifact
-from google.cloud import aiplatform
-import json
+from kfp.dsl import component
 
-@dsl.component
+@component
 def deploy(
     project_id: str,
     region: str,

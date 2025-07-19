@@ -1,13 +1,6 @@
-from kfp import dsl
-from kfp.dsl import component, Input, Output, Dataset, Model, Artifact
-from google.cloud import storage
-import pandas as pd
-import numpy as np
-from PIL import Image
-import io
-import os
+from kfp.dsl import component
 
-@dsl.component
+@component
 def preprocess(
     vision_data: str,
     tabular_data: str,
