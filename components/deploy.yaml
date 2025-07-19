@@ -19,56 +19,50 @@ implementation:
     - -c
     - |
       python3 -m pip install --quiet google-cloud-aiplatform
-      python3 -c
-    - |
+      python3 -c '
+
       import sys
       import argparse
       import json
       from google.cloud import aiplatform
 
-      parser = argparse.ArgumentParser()
-      parser.add_argument('--project_id')
-      parser.add_argument('--region')
-      parser.add_argument('--vision_model')
-      parser.add_argument('--tabular_model')
-      args = parser.parse_args()
+      import os
+      
+      # Get parameters from environment variables
+      project_id = os.environ['PROJECT_ID']
+      region = os.environ['REGION']
+      vision_model_info = json.loads(os.environ['VISION_MODEL'])
+      tabular_model_info = json.loads(os.environ['TABULAR_MODEL'])
 
       # Parse model information from JSON strings
-      vision_model_info = json.loads(args.vision_model)
-      tabular_model_info = json.loads(args.tabular_model)
+      vision_model_info = json.loads(os.environ['VISION_MODEL'])
+      tabular_model_info = json.loads(os.environ['TABULAR_MODEL'])
 
       # Initialize Vertex AI
-      aiplatform.init(project=args.project_id, location=args.region)
+      aiplatform.init(project=project_id, location=region)
 
       # Deploy vision model
-      vision_endpoint = aiplatform.Endpoint.create(display_name="crop-vision-endpoint")
-      vision_model_obj = aiplatform.Model(vision_model_info['model'])
-      vision_deploy = vision_model_obj.deploy(
-          endpoint=vision_endpoint,
-          machine_type="n1-standard-4",
+      vision_model_resource = aiplatform.Model(vision_model_info['model'])
+      vision_endpoint = vision_model_resource.deploy(
+          machine_type='n1-standard-4',
           min_replica_count=1,
-          max_replica_count=3
+          max_replica_count=1
       )
 
       # Deploy tabular model
-      tabular_endpoint = aiplatform.Endpoint.create(display_name="crop-tabular-endpoint")
-      tabular_model_obj = aiplatform.Model(tabular_model_info['model'])
-      tabular_deploy = tabular_model_obj.deploy(
-          endpoint=tabular_endpoint,
-          machine_type="n1-standard-4",
+      tabular_model_resource = aiplatform.Model(tabular_model_info['model'])
+      tabular_endpoint = tabular_model_resource.deploy(
+          machine_type='n1-standard-4',
           min_replica_count=1,
-          max_replica_count=3
+          max_replica_count=1
       )
 
       # Print outputs for KFP
       print(vision_endpoint.resource_name)
       print(tabular_endpoint.resource_name)
-    args:
-    - --project_id
-    - {inputValue: project_id}
-    - --region
-    - {inputValue: region}
-    - --vision_model
-    - {inputValue: vision_model}
-    - --tabular_model
-    - {inputValue: tabular_model}
+      '
+    env:
+      PROJECT_ID: {inputValue: project_id}
+      REGION: {inputValue: region}
+      VISION_MODEL: {inputValue: vision_model}
+      TABULAR_MODEL: {inputValue: tabular_model}

@@ -18,8 +18,8 @@ implementation:
     - -c
     - |
       python3 -m pip install --quiet google-cloud-storage pandas numpy pillow
-      python3 -c
-    - |
+      python3 -c '
+
       import sys
       import argparse
       from google.cloud import storage
@@ -28,11 +28,12 @@ implementation:
       import numpy as np
       import pandas as pd
 
-      parser = argparse.ArgumentParser()
-      parser.add_argument('--vision_data')
-      parser.add_argument('--tabular_data')
-      parser.add_argument('--bucket_name')
-      args = parser.parse_args()
+      import os
+      
+      # Get parameters from environment variables
+      vision_data = os.environ['VISION_DATA']
+      tabular_data = os.environ['TABULAR_DATA']
+      bucket_name = os.environ['BUCKET_NAME']
 
       # Initialize GCS client
       storage_client = storage.Client()
@@ -58,22 +59,18 @@ implementation:
           return df
 
       # Process and save datasets
-      vision_output_uri = f"gs://{args.bucket_name}/processed/vision_data.csv"
-      tabular_output_uri = f"gs://{args.bucket_name}/processed/tabular_data.csv"
+      vision_blob = bucket.blob('processed_vision_data.txt')
+      vision_blob.upload_from_string(vision_data)
+      vision_output_uri = f"gs://{bucket_name}/{vision_blob.name}"
 
-      # For demo, just write placeholder data
-      vision_blob = bucket.blob("processed/vision_data.csv")
-      vision_blob.upload_from_string(f"Processed vision data from {args.vision_data}")
-
-      tabular_blob = bucket.blob("processed/tabular_data.csv")
-      tabular_blob.upload_from_string(f"Processed tabular data from {args.tabular_data}")
+      tabular_blob = bucket.blob('processed_tabular_data.csv')
+      tabular_blob.upload_from_string(tabular_data)
+      tabular_output_uri = f"gs://{bucket_name}/{tabular_blob.name}"
 
       print(vision_output_uri)
       print(tabular_output_uri)
-    args:
-    - --vision_data
-    - {inputValue: vision_data}
-    - --tabular_data
-    - {inputValue: tabular_data}
-    - --bucket_name
-    - {inputValue: bucket_name}
+      '
+    env:
+      VISION_DATA: {inputValue: vision_data}
+      TABULAR_DATA: {inputValue: tabular_data}
+      BUCKET_NAME: {inputValue: bucket_name}
