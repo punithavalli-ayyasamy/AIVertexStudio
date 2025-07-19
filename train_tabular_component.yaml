@@ -1,0 +1,90 @@
+# PIPELINE DEFINITION
+# Name: mock-train-tabular
+# Inputs:
+#    dataset_uri: str
+#    min_accuracy: float
+# Outputs:
+#    model: str
+components:
+  comp-mock-train-tabular:
+    executorLabel: exec-mock-train-tabular
+    inputDefinitions:
+      parameters:
+        dataset_uri:
+          parameterType: STRING
+        min_accuracy:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      parameters:
+        model:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-mock-train-tabular:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_train_tabular
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_train_tabular(\n    dataset_uri: str,\n    min_accuracy:\
+          \ float,\n    model: dsl.OutputPath(str)\n):\n    print(f\"Training tabular\
+          \ model with data from: {dataset_uri}\")\n    print(f\"Target accuracy:\
+          \ {min_accuracy}\")\n    with open(model, 'w') as f:\n        f.write('mock_tabular_model')\n\
+          \n"
+        image: python:3.9
+pipelineInfo:
+  name: mock-train-tabular
+root:
+  dag:
+    outputs:
+      parameters:
+        model:
+          valueFromParameter:
+            outputParameterKey: model
+            producerSubtask: mock-train-tabular
+    tasks:
+      mock-train-tabular:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-train-tabular
+        inputs:
+          parameters:
+            dataset_uri:
+              componentInputParameter: dataset_uri
+            min_accuracy:
+              componentInputParameter: min_accuracy
+        taskInfo:
+          name: mock-train-tabular
+  inputDefinitions:
+    parameters:
+      dataset_uri:
+        parameterType: STRING
+      min_accuracy:
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    parameters:
+      model:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

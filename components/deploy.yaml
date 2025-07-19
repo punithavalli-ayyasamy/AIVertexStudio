@@ -1,0 +1,74 @@
+name: deploy
+description: Deploy trained models to endpoints
+
+inputs:
+- {name: project_id, type: String, description: 'GCP project ID'}
+- {name: region, type: String, description: 'GCP region'}
+- {name: vision_model, type: Dict, description: 'Vision model information'}
+- {name: tabular_model, type: Dict, description: 'Tabular model information'}
+
+outputs:
+- {name: vision_endpoint, type: String, description: 'Vision model endpoint resource name'}
+- {name: tabular_endpoint, type: String, description: 'Tabular model endpoint resource name'}
+
+implementation:
+  container:
+    image: python:3.9
+    command:
+    - sh
+    - -c
+    - |
+      python3 -m pip install --quiet google-cloud-aiplatform
+      python3 -c
+    - |
+      import sys
+      import argparse
+      import json
+      from google.cloud import aiplatform
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--project_id')
+      parser.add_argument('--region')
+      parser.add_argument('--vision_model')
+      parser.add_argument('--tabular_model')
+      args = parser.parse_args()
+
+      # Parse model information from JSON strings
+      vision_model_info = json.loads(args.vision_model)
+      tabular_model_info = json.loads(args.tabular_model)
+
+      # Initialize Vertex AI
+      aiplatform.init(project=args.project_id, location=args.region)
+
+      # Deploy vision model
+      vision_endpoint = aiplatform.Endpoint.create(display_name="crop-vision-endpoint")
+      vision_model_obj = aiplatform.Model(vision_model_info['model'])
+      vision_deploy = vision_model_obj.deploy(
+          endpoint=vision_endpoint,
+          machine_type="n1-standard-4",
+          min_replica_count=1,
+          max_replica_count=3
+      )
+
+      # Deploy tabular model
+      tabular_endpoint = aiplatform.Endpoint.create(display_name="crop-tabular-endpoint")
+      tabular_model_obj = aiplatform.Model(tabular_model_info['model'])
+      tabular_deploy = tabular_model_obj.deploy(
+          endpoint=tabular_endpoint,
+          machine_type="n1-standard-4",
+          min_replica_count=1,
+          max_replica_count=3
+      )
+
+      # Print outputs for KFP
+      print(vision_endpoint.resource_name)
+      print(tabular_endpoint.resource_name)
+    args:
+    - --project_id
+    - {inputValue: project_id}
+    - --region
+    - {inputValue: region}
+    - --vision_model
+    - {inputValue: vision_model}
+    - --tabular_model
+    - {inputValue: tabular_model}

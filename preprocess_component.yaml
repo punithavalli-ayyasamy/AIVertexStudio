@@ -1,0 +1,100 @@
+# PIPELINE DEFINITION
+# Name: mock-preprocess
+# Inputs:
+#    tabular_data: str
+#    vision_data: str
+# Outputs:
+#    tabular_dataset: str
+#    vision_dataset: str
+components:
+  comp-mock-preprocess:
+    executorLabel: exec-mock-preprocess
+    inputDefinitions:
+      parameters:
+        tabular_data:
+          parameterType: STRING
+        vision_data:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        tabular_dataset:
+          parameterType: STRING
+        vision_dataset:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-mock-preprocess:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_preprocess
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_preprocess(\n    vision_data: str,\n    tabular_data: str,\n\
+          \    vision_dataset: dsl.OutputPath(str),\n    tabular_dataset: dsl.OutputPath(str)\n\
+          ):\n    print(f\"Preprocessing vision data from: {vision_data}\")\n    print(f\"\
+          Preprocessing tabular data from: {tabular_data}\")\n    with open(vision_dataset,\
+          \ 'w') as f:\n        f.write(vision_data)\n    with open(tabular_dataset,\
+          \ 'w') as f:\n        f.write(tabular_data)\n\n"
+        image: python:3.9
+pipelineInfo:
+  name: mock-preprocess
+root:
+  dag:
+    outputs:
+      parameters:
+        tabular_dataset:
+          valueFromParameter:
+            outputParameterKey: tabular_dataset
+            producerSubtask: mock-preprocess
+        vision_dataset:
+          valueFromParameter:
+            outputParameterKey: vision_dataset
+            producerSubtask: mock-preprocess
+    tasks:
+      mock-preprocess:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-preprocess
+        inputs:
+          parameters:
+            tabular_data:
+              componentInputParameter: tabular_data
+            vision_data:
+              componentInputParameter: vision_data
+        taskInfo:
+          name: mock-preprocess
+  inputDefinitions:
+    parameters:
+      tabular_data:
+        parameterType: STRING
+      vision_data:
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      tabular_dataset:
+        parameterType: STRING
+      vision_dataset:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

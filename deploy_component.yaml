@@ -1,0 +1,90 @@
+# PIPELINE DEFINITION
+# Name: mock-deploy
+# Inputs:
+#    tabular_model: str
+#    vision_model: str
+# Outputs:
+#    endpoint: str
+components:
+  comp-mock-deploy:
+    executorLabel: exec-mock-deploy
+    inputDefinitions:
+      parameters:
+        tabular_model:
+          parameterType: STRING
+        vision_model:
+          parameterType: STRING
+    outputDefinitions:
+      parameters:
+        endpoint:
+          parameterType: STRING
+deploymentSpec:
+  executors:
+    exec-mock-deploy:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_deploy
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_deploy(\n    vision_model: str,\n    tabular_model: str,\n\
+          \    endpoint: dsl.OutputPath(str)\n):\n    print(f\"Deploying vision model:\
+          \ {vision_model}\")\n    print(f\"Deploying tabular model: {tabular_model}\"\
+          )\n    with open(endpoint, 'w') as f:\n        f.write('mock_endpoint')\n\
+          \n"
+        image: python:3.9
+pipelineInfo:
+  name: mock-deploy
+root:
+  dag:
+    outputs:
+      parameters:
+        endpoint:
+          valueFromParameter:
+            outputParameterKey: endpoint
+            producerSubtask: mock-deploy
+    tasks:
+      mock-deploy:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-deploy
+        inputs:
+          parameters:
+            tabular_model:
+              componentInputParameter: tabular_model
+            vision_model:
+              componentInputParameter: vision_model
+        taskInfo:
+          name: mock-deploy
+  inputDefinitions:
+    parameters:
+      tabular_model:
+        parameterType: STRING
+      vision_model:
+        parameterType: STRING
+  outputDefinitions:
+    parameters:
+      endpoint:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

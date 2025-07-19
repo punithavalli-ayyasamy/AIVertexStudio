@@ -1,0 +1,296 @@
+# PIPELINE DEFINITION
+# Name: local-agriautoml-pipeline
+# Description: Local testing version of agricultural yield prediction pipeline
+# Inputs:
+#    min_accuracy: float [Default: 0.8]
+#    tabular_dataset_path: str
+#    vision_dataset_path: str
+components:
+  comp-mock-deploy:
+    executorLabel: exec-mock-deploy
+    inputDefinitions:
+      artifacts:
+        tabular_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        vision_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        endpoint:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-mock-preprocess:
+    executorLabel: exec-mock-preprocess
+    inputDefinitions:
+      parameters:
+        tabular_data:
+          parameterType: STRING
+        vision_data:
+          parameterType: STRING
+    outputDefinitions:
+      artifacts:
+        tabular_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        vision_dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-mock-train-tabular:
+    executorLabel: exec-mock-train-tabular
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        min_accuracy:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-mock-train-vision:
+    executorLabel: exec-mock-train-vision
+    inputDefinitions:
+      artifacts:
+        dataset:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        min_accuracy:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-mock-deploy:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_deploy
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_deploy(\n    vision_model: Input[Model],\n    tabular_model:\
+          \ Input[Model],\n    endpoint: Output[Artifact]\n):\n    print(f\"Deploying\
+          \ vision model: {vision_model.path}\")\n    print(f\"Deploying tabular model:\
+          \ {tabular_model.path}\")\n    with open(endpoint.path, 'w') as f:\n   \
+          \     f.write('mock_endpoint')\n\n"
+        image: python:3.9
+    exec-mock-preprocess:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_preprocess
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_preprocess(\n    vision_data: str,\n    tabular_data: str,\n\
+          \    vision_dataset: Output[Dataset],\n    tabular_dataset: Output[Dataset]\n\
+          ):\n    print(f\"Preprocessing vision data from: {vision_data}\")\n    print(f\"\
+          Preprocessing tabular data from: {tabular_data}\")\n    with open(vision_dataset.path,\
+          \ 'w') as f:\n        f.write(vision_data)\n    with open(tabular_dataset.path,\
+          \ 'w') as f:\n        f.write(tabular_data)\n\n"
+        image: python:3.9
+    exec-mock-train-tabular:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_train_tabular
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_train_tabular(\n    dataset: Input[Dataset],\n    min_accuracy:\
+          \ float,\n    model: Output[Model]\n):\n    print(f\"Training tabular model\
+          \ with data from: {dataset.path}\")\n    print(f\"Target accuracy: {min_accuracy}\"\
+          )\n    with open(model.path, 'w') as f:\n        f.write('mock_tabular_model')\n\
+          \n"
+        image: python:3.9
+    exec-mock-train-vision:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - mock_train_vision
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef mock_train_vision(\n    dataset: Input[Dataset],\n    min_accuracy:\
+          \ float,\n    model: Output[Model]\n):\n    print(f\"Training vision model\
+          \ with data from: {dataset.path}\")\n    print(f\"Target accuracy: {min_accuracy}\"\
+          )\n    with open(model.path, 'w') as f:\n        f.write('mock_vision_model')\n\
+          \n"
+        image: python:3.9
+pipelineInfo:
+  description: Local testing version of agricultural yield prediction pipeline
+  name: local-agriautoml-pipeline
+root:
+  dag:
+    tasks:
+      mock-deploy:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-deploy
+        dependentTasks:
+        - mock-train-tabular
+        - mock-train-vision
+        inputs:
+          artifacts:
+            tabular_model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: mock-train-tabular
+            vision_model:
+              taskOutputArtifact:
+                outputArtifactKey: model
+                producerTask: mock-train-vision
+        taskInfo:
+          name: mock-deploy
+      mock-preprocess:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-preprocess
+        inputs:
+          parameters:
+            tabular_data:
+              componentInputParameter: tabular_dataset_path
+            vision_data:
+              componentInputParameter: vision_dataset_path
+        taskInfo:
+          name: mock-preprocess
+      mock-train-tabular:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-train-tabular
+        dependentTasks:
+        - mock-preprocess
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: tabular_dataset
+                producerTask: mock-preprocess
+          parameters:
+            min_accuracy:
+              componentInputParameter: min_accuracy
+        taskInfo:
+          name: mock-train-tabular
+      mock-train-vision:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-mock-train-vision
+        dependentTasks:
+        - mock-preprocess
+        inputs:
+          artifacts:
+            dataset:
+              taskOutputArtifact:
+                outputArtifactKey: vision_dataset
+                producerTask: mock-preprocess
+          parameters:
+            min_accuracy:
+              componentInputParameter: min_accuracy
+        taskInfo:
+          name: mock-train-vision
+  inputDefinitions:
+    parameters:
+      min_accuracy:
+        defaultValue: 0.8
+        isOptional: true
+        parameterType: NUMBER_DOUBLE
+      tabular_dataset_path:
+        parameterType: STRING
+      vision_dataset_path:
+        parameterType: STRING
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.13.0

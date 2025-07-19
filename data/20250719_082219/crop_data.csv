@@ -1,0 +1,4 @@
+date,location,crop_type,field_size,rainfall,temperature,yield
+2025-01-01,Iowa,corn,5.0,750,25,150
+2025-01-15,Kansas,wheat,3.5,500,22,120
+2025-02-01,Nebraska,soybean,4.2,600,24,130

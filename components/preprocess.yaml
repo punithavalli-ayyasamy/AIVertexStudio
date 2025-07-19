@@ -1,0 +1,79 @@
+name: preprocess
+description: Preprocess vision and tabular data for training
+
+inputs:
+- {name: vision_data, type: String, description: 'GCS URI for vision dataset'}
+- {name: tabular_data, type: String, description: 'GCS URI for tabular dataset'}
+- {name: bucket_name, type: String, description: 'GCS bucket for processed data'}
+
+outputs:
+- {name: vision_dataset, type: String, description: 'Processed vision dataset URI'}
+- {name: tabular_dataset, type: String, description: 'Processed tabular dataset URI'}
+
+implementation:
+  container:
+    image: python:3.9
+    command:
+    - sh
+    - -c
+    - |
+      python3 -m pip install --quiet google-cloud-storage pandas numpy pillow
+      python3 -c
+    - |
+      import sys
+      import argparse
+      from google.cloud import storage
+      from PIL import Image
+      import io
+      import numpy as np
+      import pandas as pd
+
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--vision_data')
+      parser.add_argument('--tabular_data')
+      parser.add_argument('--bucket_name')
+      args = parser.parse_args()
+
+      # Initialize GCS client
+      storage_client = storage.Client()
+      bucket = storage_client.bucket(args.bucket_name)
+
+      # Process vision data
+      def process_image(image_bytes):
+          img = Image.open(io.BytesIO(image_bytes))
+          img = img.resize((224, 224))  # Standard size for many vision models
+          return np.array(img)
+
+      # Process tabular data
+      def process_tabular(df):
+          # Handle missing values
+          df = df.fillna(df.mean())
+          
+          # Feature engineering
+          if "planting_date" in df.columns:
+              df["planting_date"] = pd.to_datetime(df["planting_date"])
+              df["planting_month"] = df["planting_date"].dt.month
+              df["planting_day"] = df["planting_date"].dt.day
+          
+          return df
+
+      # Process and save datasets
+      vision_output_uri = f"gs://{args.bucket_name}/processed/vision_data.csv"
+      tabular_output_uri = f"gs://{args.bucket_name}/processed/tabular_data.csv"
+
+      # For demo, just write placeholder data
+      vision_blob = bucket.blob("processed/vision_data.csv")
+      vision_blob.upload_from_string(f"Processed vision data from {args.vision_data}")
+
+      tabular_blob = bucket.blob("processed/tabular_data.csv")
+      tabular_blob.upload_from_string(f"Processed tabular data from {args.tabular_data}")
+
+      print(vision_output_uri)
+      print(tabular_output_uri)
+    args:
+    - --vision_data
+    - {inputValue: vision_data}
+    - --tabular_data
+    - {inputValue: tabular_data}
+    - --bucket_name
+    - {inputValue: bucket_name}
