@@ -1,19 +1,16 @@
 from kfp import dsl
-from kfp.dsl import component, Input, Output, Dataset, Model
+from kfp.dsl import component, Input, Output, Dataset, Model, Artifact
 from google.cloud import aiplatform
 import json
 
-@component(
-    base_image='python:3.9',
-    packages_to_install=['google-cloud-aiplatform']
-)
+@dsl.component
 def train_tabular(
     project_id: str,
     region: str,
-    dataset: Input[Dataset],
+    dataset: Input[Artifact],
     min_accuracy: float,
-    model: Output[Model]
-):
+    model: Output[Artifact]
+) -> None:
     """Train AutoML Tabular model for crop yield prediction.
     
     Args:

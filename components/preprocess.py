@@ -1,5 +1,5 @@
 from kfp import dsl
-from kfp.dsl import component, Output, Dataset
+from kfp.dsl import component, Input, Output, Dataset, Model, Artifact
 from google.cloud import storage
 import pandas as pd
 import numpy as np
@@ -7,17 +7,14 @@ from PIL import Image
 import io
 import os
 
-@component(
-    base_image='python:3.9',
-    packages_to_install=['google-cloud-storage', 'pandas', 'pillow']
-)
+@dsl.component
 def preprocess(
     vision_data: str,
     tabular_data: str,
     bucket_name: str,
-    vision_dataset: Output[Dataset],
-    tabular_dataset: Output[Dataset]
-):
+    vision_dataset: Output[Artifact],
+    tabular_dataset: Output[Artifact]
+) -> None:
     """Preprocess vision and tabular data for training.
     
     Args:

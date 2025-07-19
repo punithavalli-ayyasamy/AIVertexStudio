@@ -3,17 +3,14 @@ from kfp.dsl import component, Input, Output, Model, Artifact
 from google.cloud import aiplatform
 import json
 
-@component(
-    base_image='python:3.9',
-    packages_to_install=['google-cloud-aiplatform']
-)
+@dsl.component
 def deploy(
     project_id: str,
     region: str,
-    vision_model: Input[Model],
-    tabular_model: Input[Model],
+    vision_model: Input[Artifact],
+    tabular_model: Input[Artifact],
     endpoint: Output[Artifact]
-):
+) -> None:
     """Deploy trained models to endpoints.
     
     Args:
