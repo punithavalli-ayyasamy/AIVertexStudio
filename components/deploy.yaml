@@ -15,11 +15,14 @@ implementation:
   container:
     image: python:3.9
     command:
-    - sh
+    - python3
     - -c
     - |
-      python3 -m pip install --quiet google-cloud-aiplatform
-      python3 -c '
+      import os
+      import sys
+      import argparse
+      from google.cloud import aiplatform
+      import json
 
       import sys
       import argparse
@@ -61,8 +64,12 @@ implementation:
       print(vision_endpoint.resource_name)
       print(tabular_endpoint.resource_name)
       '
-    env:
-      PROJECT_ID: {inputValue: project_id}
-      REGION: {inputValue: region}
-      VISION_MODEL: {inputValue: vision_model}
-      TABULAR_MODEL: {inputValue: tabular_model}
+    args:
+    - --project_id
+    - {inputValue: project_id}
+    - --region
+    - {inputValue: region}
+    - --vision_model
+    - {inputValue: vision_model}
+    - --tabular_model
+    - {inputValue: tabular_model}

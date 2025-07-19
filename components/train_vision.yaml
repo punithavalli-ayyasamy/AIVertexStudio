@@ -14,11 +14,14 @@ implementation:
   container:
     image: python:3.9
     command:
-    - sh
+    - python3
     - -c
     - |
-      python3 -m pip install --quiet google-cloud-aiplatform pandas numpy pillow
-      python3 -c '
+      import os
+      import sys
+      import argparse
+      from google.cloud import aiplatform
+      import json
 
       import sys
       import argparse
@@ -71,8 +74,12 @@ implementation:
       }
       print(json.dumps(model_info))
       '
-    env:
-      PROJECT_ID: {inputValue: project_id}
-      REGION: {inputValue: region}
-      DATASET: {inputValue: dataset}
-      MIN_ACCURACY: {inputValue: min_accuracy}
+    args:
+    - --project_id
+    - {inputValue: project_id}
+    - --region
+    - {inputValue: region}
+    - --dataset
+    - {inputValue: dataset}
+    - --min_accuracy
+    - {inputValue: min_accuracy}
