@@ -12,12 +12,14 @@ outputs:
 
 implementation:
   container:
-    image: python:3.9
+    image: gcr.io/google-appengine/python:latest
+    env:
+      PYTHONPATH: /pipeline
     command:
     - sh
     - -c
     - |
-      python3 -m pip install --no-cache-dir \
+      pip install --no-cache-dir \
         google-cloud-storage==2.9.0 \
         pandas==2.0.3 \
         numpy==1.24.3 \
