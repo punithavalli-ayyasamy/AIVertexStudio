@@ -9,217 +9,325 @@
 #    tabular_dataset_uri: str
 #    vision_dataset_uri: str
 components:
-  comp-deploy:
-    executorLabel: exec-deploy
+  comp-deploy-models:
+    executorLabel: exec-deploy-models
     inputDefinitions:
+      artifacts:
+        tabular_model:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+          description: Input artifact containing tabular model information
+        vision_model:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+          description: Input artifact containing vision model information
       parameters:
         project_id:
+          description: GCP project ID
           parameterType: STRING
         region:
+          description: GCP region
           parameterType: STRING
-        tabular_model:
-          parameterType: STRUCT
-        vision_model:
-          parameterType: STRUCT
     outputDefinitions:
-      parameters:
-        tabular_endpoint:
-          parameterType: STRING
-        vision_endpoint:
-          parameterType: STRING
-  comp-preprocess:
-    executorLabel: exec-preprocess
+      artifacts:
+        endpoints:
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-preprocess-data:
+    executorLabel: exec-preprocess-data
     inputDefinitions:
       parameters:
         bucket_name:
+          description: GCS bucket for processed data
           parameterType: STRING
         tabular_data:
+          description: GCS URI for tabular dataset
           parameterType: STRING
         vision_data:
+          description: GCS URI for vision dataset
           parameterType: STRING
     outputDefinitions:
-      parameters:
+      artifacts:
         tabular_dataset:
-          parameterType: STRING
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
         vision_dataset:
-          parameterType: STRING
-  comp-train-tabular:
-    executorLabel: exec-train-tabular
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-train-tabular-model:
+    executorLabel: exec-train-tabular-model
     inputDefinitions:
-      parameters:
+      artifacts:
         dataset:
-          parameterType: STRING
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+          description: Input artifact containing the processed tabular dataset URI
+      parameters:
         min_accuracy:
+          description: Minimum required accuracy (RMSE threshold)
           parameterType: NUMBER_DOUBLE
         project_id:
+          description: GCP project ID
           parameterType: STRING
         region:
+          description: GCP region
           parameterType: STRING
     outputDefinitions:
-      parameters:
+      artifacts:
         model_info:
-          parameterType: STRUCT
-  comp-train-vision:
-    executorLabel: exec-train-vision
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+  comp-train-vision-model:
+    executorLabel: exec-train-vision-model
     inputDefinitions:
-      parameters:
+      artifacts:
         dataset:
-          parameterType: STRING
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
+          description: Input artifact containing the processed vision dataset URI
+      parameters:
         min_accuracy:
+          description: Minimum required accuracy
           parameterType: NUMBER_DOUBLE
         project_id:
+          description: GCP project ID
           parameterType: STRING
         region:
+          description: GCP region
           parameterType: STRING
     outputDefinitions:
-      parameters:
+      artifacts:
         model_info:
-          parameterType: STRUCT
+          artifactType:
+            schemaTitle: system.Artifact
+            schemaVersion: 0.0.1
 deploymentSpec:
   executors:
-    exec-deploy:
+    exec-deploy-models:
       container:
         args:
-        - --project_id
-        - '{{$.inputs.parameters[''project_id'']}}'
-        - --region
-        - '{{$.inputs.parameters[''region'']}}'
-        - --vision_model
-        - '{{$.inputs.parameters[''vision_model'']}}'
-        - --tabular_model
-        - '{{$.inputs.parameters[''tabular_model'']}}'
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - deploy_models
         command:
-        - python3
+        - sh
         - -c
-        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
-          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
-          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
-          \ type=str, required=True)\nparser.add_argument('--vision_model', type=str,\
-          \ required=True)\nparser.add_argument('--tabular_model', type=str, required=True)\n\
-          args = parser.parse_args()\n\n# Parse model information from JSON strings\n\
-          vision_model_info = json.loads(args.vision_model)\ntabular_model_info =\
-          \ json.loads(args.tabular_model)\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
-          \ location=args.region)\n\n# Deploy vision model\nvision_model_resource\
-          \ = aiplatform.Model(vision_model_info['model'])\nvision_endpoint = vision_model_resource.deploy(\n\
-          \    machine_type='n1-standard-4',\n    min_replica_count=1,\n    max_replica_count=1\n\
-          )\n\n# Deploy tabular model\ntabular_model_resource = aiplatform.Model(tabular_model_info['model'])\n\
-          tabular_endpoint = tabular_model_resource.deploy(\n    machine_type='n1-standard-4',\n\
-          \    min_replica_count=1,\n    max_replica_count=1\n)\n\n# Print outputs\
-          \ for KFP\nprint(vision_endpoint.resource_name)\nprint(tabular_endpoint.resource_name)\n"
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef deploy_models(\n    project_id: str,\n    region: str,\n    vision_model:\
+          \ Input[Artifact],\n    tabular_model: Input[Artifact],\n    endpoints:\
+          \ Output[Artifact]\n):\n    \"\"\"\n    Deploy trained models to endpoints\n\
+          \n     Args:\n        project_id: GCP project ID\n        region: GCP region\n\
+          \        vision_model: Input artifact containing vision model information\n\
+          \        tabular_model: Input artifact containing tabular model information\n\
+          \        endpoints: Output artifact for endpoint information\n    \"\"\"\
+          \n    import json\n\n     # Read model info from input artifacts\n    with\
+          \ open(vision_model.path, 'r') as f:\n        vision_model_info = json.load(f)\n\
+          \n    with open(tabular_model.path, 'r') as f:\n        tabular_model_info\
+          \ = json.load(f)\n    # Initialize Vertex AI\n    aiplatform.init(project=project_id,\
+          \ location=region)\n\n    # Deploy vision model\n    vision_model_resource\
+          \ = aiplatform.Model(vision_model_info['model'])\n    vision_endpoint =\
+          \ vision_model_resource.deploy(\n        machine_type='n1-standard-4',\n\
+          \        min_replica_count=1,\n        max_replica_count=1\n    )\n\n  \
+          \  # Deploy tabular model\n    tabular_model_resource = aiplatform.Model(tabular_model_info['model'])\n\
+          \    tabular_endpoint = tabular_model_resource.deploy(\n        machine_type='n1-standard-4',\n\
+          \        min_replica_count=1,\n        max_replica_count=1\n    )\n\n  \
+          \      # Write endpoint information to output artifact\n    endpoint_info\
+          \ = {\n        'vision_endpoint': vision_endpoint.resource_name,\n     \
+          \   'tabular_endpoint': tabular_endpoint.resource_name\n    }\n\n    with\
+          \ open(endpoints.path, 'w') as f:\n        json.dump(endpoint_info, f)\n\
+          \n"
         image: python:3.9
-    exec-preprocess:
+    exec-preprocess-data:
       container:
         args:
-        - --vision_data
-        - '{{$.inputs.parameters[''vision_data'']}}'
-        - --tabular_data
-        - '{{$.inputs.parameters[''tabular_data'']}}'
-        - --bucket_name
-        - '{{$.inputs.parameters[''bucket_name'']}}'
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - preprocess_data
         command:
-        - python3
+        - sh
         - -c
-        - "import os\nimport sys\nimport argparse\nfrom google.cloud import storage\n\
-          from PIL import Image\nimport io\nimport numpy as np\nimport pandas as pd\n\
-          \n# Parse command line arguments\nparser = argparse.ArgumentParser()\nparser.add_argument('--vision_data',\
-          \ type=str, required=True)\nparser.add_argument('--tabular_data', type=str,\
-          \ required=True)\nparser.add_argument('--bucket_name', type=str, required=True)\n\
-          args = parser.parse_args()\n\n# Get parameters from arguments\nvision_data\
-          \ = args.vision_data\ntabular_data = args.tabular_data\nbucket_name = args.bucket_name\n\
-          \n# Initialize GCS client\nstorage_client = storage.Client()\nbucket = storage_client.bucket(bucket_name)\n\
-          \n# Process vision data\ndef process_image(image_bytes):\n    img = Image.open(io.BytesIO(image_bytes))\n\
-          \    img = img.resize((224, 224))  # Standard size for many vision models\n\
-          \    return np.array(img)\n\n# Process tabular data\ndef process_tabular(df):\n\
-          \    # Handle missing values\n    df = df.fillna(df.mean())\n    \n    #\
-          \ Feature engineering\n    if \"planting_date\" in df.columns:\n       \
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef preprocess_data(\n    vision_data: str,\n    tabular_data: str,\n\
+          \    bucket_name: str,\n    vision_dataset: Output[Artifact],\n    tabular_dataset:\
+          \ Output[Artifact]\n):\n    \"\"\"\n    Preprocess vision and tabular data\
+          \ for training\n\n    Args:\n        vision_data: GCS URI for vision dataset\n\
+          \        tabular_data: GCS URI for tabular dataset\n        bucket_name:\
+          \ GCS bucket for processed data\n\n    Returns:\n        tuple: (vision_dataset,\
+          \ tabular_dataset)\n    \"\"\"\n    # Initialize GCS client\n    storage_client\
+          \ = storage.Client()\n    bucket = storage_client.bucket(bucket_name)\n\n\
+          \    # Process vision data\n    def process_image(image_bytes):\n      \
+          \  img = Image.open(io.BytesIO(image_bytes))\n        img = img.resize((224,\
+          \ 224))  # Standard size for many vision models\n        return np.array(img)\n\
+          \n    # Process tabular data\n    def process_tabular(df):\n        # Handle\
+          \ missing values\n        df = df.fillna(df.mean())\n\n        # Feature\
+          \ engineering\n        if \"planting_date\" in df.columns:\n           \
           \ df[\"planting_date\"] = pd.to_datetime(df[\"planting_date\"])\n      \
-          \  df[\"planting_month\"] = df[\"planting_date\"].dt.month\n        df[\"\
-          planting_day\"] = df[\"planting_date\"].dt.day\n    \n    return df\n\n\
-          # Process and save datasets\nvision_blob = bucket.blob('processed_vision_data.txt')\n\
-          vision_blob.upload_from_string(vision_data)\nvision_output_uri = f\"gs://{bucket_name}/{vision_blob.name}\"\
-          \n\ntabular_blob = bucket.blob('processed_tabular_data.csv')\ntabular_blob.upload_from_string(tabular_data)\n\
-          tabular_output_uri = f\"gs://{bucket_name}/{tabular_blob.name}\"\n\nprint(vision_output_uri)\n\
-          print(tabular_output_uri)\n"
+          \      df[\"planting_month\"] = df[\"planting_date\"].dt.month\n       \
+          \     df[\"planting_day\"] = df[\"planting_date\"].dt.day\n\n        return\
+          \ df\n\n    # Process and save datasets\n    vision_blob = bucket.blob('processed_vision_data.txt')\n\
+          \    vision_blob.upload_from_string(vision_data)\n    vision_output_uri\
+          \ = f\"gs://{bucket_name}/{vision_blob.name}\"\n\n     # Save to the KFP\
+          \ output location\n    with open(vision_dataset.path, 'w') as f:\n     \
+          \   f.write(vision_output_uri)\n\n    tabular_blob = bucket.blob('processed_tabular_data.csv')\n\
+          \    tabular_blob.upload_from_string(tabular_data)\n    tabular_output_uri\
+          \ = f\"gs://{bucket_name}/{tabular_blob.name}\"\n\n    # Save to the KFP\
+          \ output location\n    with open(tabular_dataset.path, 'w') as f:\n    \
+          \    f.write(tabular_output_uri)\n\n"
         image: python:3.9
-    exec-train-tabular:
+    exec-train-tabular-model:
       container:
         args:
-        - --project_id
-        - '{{$.inputs.parameters[''project_id'']}}'
-        - --region
-        - '{{$.inputs.parameters[''region'']}}'
-        - --dataset
-        - '{{$.inputs.parameters[''dataset'']}}'
-        - --min_accuracy
-        - '{{$.inputs.parameters[''min_accuracy'']}}'
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_tabular_model
         command:
-        - python3
+        - sh
         - -c
-        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
-          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
-          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
-          \ type=str, required=True)\nparser.add_argument('--dataset', type=str, required=True)\n\
-          parser.add_argument('--min_accuracy', type=float, required=True)\nargs =\
-          \ parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
-          \ location=args.region)\n\n# Create dataset\nai_dataset = aiplatform.TabularDataset.create(\n\
-          \    display_name=\"crop_tabular_dataset\",\n    gcs_source=args.dataset\n\
-          )\n\n# Train model\njob = aiplatform.AutoMLTabularTrainingJob(\n    display_name=\"\
-          crop_tabular_model\",\n    optimization_objective=\"minimize-rmse\",\n \
-          \   column_transformations=[\n        {\"numeric\": {\"column_name\": \"\
-          field_size\"}},\n        {\"numeric\": {\"column_name\": \"rainfall\"}},\n\
-          \        {\"numeric\": {\"column_name\": \"temperature\"}},\n        {\"\
-          categorical\": {\"column_name\": \"location\"}},\n        {\"categorical\"\
-          : {\"column_name\": \"crop_type\"}},\n        {\"timestamp\": {\"column_name\"\
-          : \"date\"}}\n    ],\n    target_column=\"yield\",\n    budget_milli_node_hours=83,\
-          \  # Approximately 5 minutes (83 milli-node hours)\n    optimization_prediction_type=\"\
-          regression\",\n    additional_experiments=[\"enable_model_compression\"\
-          ]  # Optional: Enable model compression\n)\n\n# Run the training job\nai_model\
-          \ = job.run(\n    dataset=ai_dataset,\n    model_display_name=\"crop_yield_model\"\
-          ,\n    training_fraction_split=0.8,\n    validation_fraction_split=0.1,\n\
-          \    test_fraction_split=0.1\n)\n\n# Get model evaluation\neval_metrics\
-          \ = ai_model.list_model_evaluations()[0]\n\n# Check if model meets accuracy\
-          \ threshold\nif eval_metrics.metrics['rmse'] > args.min_accuracy:\n    raise\
-          \ ValueError(f\"Model RMSE {eval_metrics.metrics['rmse']} above threshold\
-          \ {args.min_accuracy}\")\n\n# Print output as JSON for KFP\nmodel_info =\
-          \ {\n    'model': ai_model.resource_name,\n    'rmse': float(eval_metrics.metrics['rmse'])\n\
-          }\nprint(json.dumps(model_info))\n"
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_tabular_model(\n    project_id: str,\n    region: str,\n\
+          \    dataset: Input[Artifact],\n    min_accuracy: float,\n    model_info:\
+          \ Output[Artifact]\n):\n    \"\"\"\n    Train AutoML Tabular model for crop\
+          \ yield prediction\n\n    Args:\n        project_id: GCP project ID\n  \
+          \      region: GCP region\n        dataset: Input artifact containing the\
+          \ processed tabular dataset URI\n        min_accuracy: Minimum required\
+          \ accuracy (RMSE threshold)\n        model_info: Output artifact for model\
+          \ information\n    \"\"\"\n     # Read dataset URI from input artifact\n\
+          \    with open(dataset.path, 'r') as f:\n        dataset_uri = f.read().strip()\n\
+          \n    # Initialize Vertex AI\n    aiplatform.init(project=project_id, location=region)\n\
+          \n    # Create dataset\n    ai_dataset = aiplatform.TabularDataset.create(\n\
+          \        display_name=\"crop_tabular_dataset\",\n        gcs_source=dataset_uri\n\
+          \    )\n\n    # Train model\n    job = aiplatform.AutoMLTabularTrainingJob(\n\
+          \        display_name=\"crop_tabular_model\",\n        optimization_objective=\"\
+          minimize-rmse\",\n        column_transformations=[\n            {\"numeric\"\
+          : {\"column_name\": \"field_size\"}},\n            {\"numeric\": {\"column_name\"\
+          : \"rainfall\"}},\n            {\"numeric\": {\"column_name\": \"temperature\"\
+          }},\n            {\"categorical\": {\"column_name\": \"location\"}},\n \
+          \           {\"categorical\": {\"column_name\": \"crop_type\"}},\n     \
+          \       {\"timestamp\": {\"column_name\": \"date\"}}\n        ],\n     \
+          \   target_column=\"yield\",\n        budget_milli_node_hours=83,  # Approximately\
+          \ 5 minutes\n        optimization_prediction_type=\"regression\",\n    \
+          \    additional_experiments=[\"enable_model_compression\"]\n    )\n\n  \
+          \  # Run the training job\n    ai_model = job.run(\n        dataset=ai_dataset,\n\
+          \        model_display_name=\"crop_yield_model\",\n        training_fraction_split=0.8,\n\
+          \        validation_fraction_split=0.1,\n        test_fraction_split=0.1\n\
+          \    )\n\n    # Get model evaluation\n    eval_metrics = ai_model.list_model_evaluations()[0]\n\
+          \n    # Check if model meets accuracy threshold\n    if eval_metrics.metrics['rmse']\
+          \ > min_accuracy:\n        raise ValueError(f\"Model RMSE {eval_metrics.metrics['rmse']}\
+          \ above threshold {min_accuracy}\")\n\n    # Return model info\n    model_info\
+          \ = {\n        'model': ai_model.resource_name,\n        'rmse': float(eval_metrics.metrics['rmse'])\n\
+          \    }\n    with open(model_info.path, 'w') as f:\n        json.dump(info,\
+          \ f)\n\n"
         image: python:3.9
-    exec-train-vision:
+    exec-train-vision-model:
       container:
         args:
-        - --project_id
-        - '{{$.inputs.parameters[''project_id'']}}'
-        - --region
-        - '{{$.inputs.parameters[''region'']}}'
-        - --dataset
-        - '{{$.inputs.parameters[''dataset'']}}'
-        - --min_accuracy
-        - '{{$.inputs.parameters[''min_accuracy'']}}'
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_vision_model
         command:
-        - python3
+        - sh
         - -c
-        - "import os\nimport sys\nimport argparse\nfrom google.cloud import aiplatform\n\
-          import json\n\n# Parse command line arguments\nparser = argparse.ArgumentParser()\n\
-          parser.add_argument('--project_id', type=str, required=True)\nparser.add_argument('--region',\
-          \ type=str, required=True)\nparser.add_argument('--dataset', type=str, required=True)\n\
-          parser.add_argument('--min_accuracy', type=float, required=True)\nargs =\
-          \ parser.parse_args()\n\n# Initialize Vertex AI\naiplatform.init(project=args.project_id,\
-          \ location=args.region)\n\n# Create dataset\nai_dataset = aiplatform.ImageDataset.create(\n\
-          \    display_name=\"crop_vision_dataset\",\n    gcs_source=args.dataset\n\
-          )\n\n# Train model\njob = aiplatform.AutoMLImageTrainingJob(\n    display_name=\"\
-          crop_vision_model\",\n    prediction_type=\"classification\",\n    budget_milli_node_hours=83,\
-          \  # Approximately 5 minutes (83 milli-node hours)\n    model_type=\"CLOUD\"\
-          ,\n    base_model=None\n)\n\n# Run the training job\nai_model = job.run(\n\
-          \    dataset=ai_dataset,\n    budget_milli_node_hours=83,  # 5 minutes for\
-          \ testing\n    training_filter_split=\"\",  # No filter\n    model_display_name=\"\
-          crop_vision_model\",\n    training_fraction_split=0.8,\n    validation_fraction_split=0.1,\n\
-          \    test_fraction_split=0.1\n)\n\n# Get model evaluation\neval_metrics\
-          \ = ai_model.list_model_evaluations()[0]\n\n# Check if model meets accuracy\
-          \ threshold\nif eval_metrics.metrics['auRoc'] < args.min_accuracy:\n   \
-          \ raise ValueError(f\"Model accuracy {eval_metrics.metrics['auRoc']} below\
-          \ threshold {args.min_accuracy}\")\n\n# Print output as JSON for KFP\nmodel_info\
-          \ = {\n    'model': ai_model.resource_name,\n    'accuracy': float(eval_metrics.metrics['auRoc'])\n\
-          }\nprint(json.dumps(model_info))\n"
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.13.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_vision_model(\n    project_id: str,\n    region: str,\n\
+          \    dataset: Input[Artifact],\n    min_accuracy: float,\n    model_info:\
+          \ Output[Artifact]\n):\n    \"\"\"\n    Train AutoML Vision model for crop\
+          \ analysis\n\n    Args:\n        project_id: GCP project ID\n        region:\
+          \ GCP region\n        dataset: Input artifact containing the processed vision\
+          \ dataset URI\n        min_accuracy: Minimum required accuracy\n       \
+          \ model_info: Output artifact for model information\n    \"\"\"\n     #\
+          \ Read dataset URI from input artifact\n    with open(dataset.path, 'r')\
+          \ as f:\n        dataset_uri = f.read().strip()\n\n    # Initialize Vertex\
+          \ AI\n    aiplatform.init(project=project_id, location=region)\n\n    #\
+          \ Create dataset\n    ai_dataset = aiplatform.ImageDataset.create(\n   \
+          \     display_name=\"crop_vision_dataset\",\n        gcs_source=dataset_uri\n\
+          \    )\n\n    # Train model\n    job = aiplatform.AutoMLImageTrainingJob(\n\
+          \        display_name=\"crop_vision_model\",\n        prediction_type=\"\
+          classification\",\n        budget_milli_node_hours=83,  # Approximately\
+          \ 5 minutes\n        model_type=\"CLOUD\",\n        base_model=None\n  \
+          \  )\n\n    # Run the training job\n    ai_model = job.run(\n        dataset=ai_dataset,\n\
+          \        budget_milli_node_hours=83,  # 5 minutes for testing\n        training_filter_split=\"\
+          \",  # No filter\n        model_display_name=\"crop_vision_model\",\n  \
+          \      training_fraction_split=0.8,\n        validation_fraction_split=0.1,\n\
+          \        test_fraction_split=0.1\n    )\n\n    # Get model evaluation\n\
+          \    eval_metrics = ai_model.list_model_evaluations()[0]\n\n    # Check\
+          \ if model meets accuracy threshold\n    if eval_metrics.metrics['auRoc']\
+          \ < min_accuracy:\n        raise ValueError(f\"Model accuracy {eval_metrics.metrics['auRoc']}\
+          \ below threshold {min_accuracy}\")\n\n    # Return model info\n    model_info\
+          \ = {\n        'model': ai_model.resource_name,\n        'accuracy': float(eval_metrics.metrics['auRoc'])\n\
+          \    }\n    with open(model_info.path, 'w') as f:\n        json.dump(info,\
+          \ f)\n\n"
         image: python:3.9
 pipelineInfo:
   description: End-to-end pipeline for agricultural yield prediction
@@ -227,35 +335,36 @@ pipelineInfo:
 root:
   dag:
     tasks:
-      deploy:
+      deploy-models:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-deploy
+          name: comp-deploy-models
         dependentTasks:
-        - train-tabular
-        - train-vision
+        - train-tabular-model
+        - train-vision-model
         inputs:
+          artifacts:
+            tabular_model:
+              taskOutputArtifact:
+                outputArtifactKey: model_info
+                producerTask: train-tabular-model
+            vision_model:
+              taskOutputArtifact:
+                outputArtifactKey: model_info
+                producerTask: train-vision-model
           parameters:
             project_id:
               componentInputParameter: project_id
             region:
               componentInputParameter: region
-            tabular_model:
-              taskOutputParameter:
-                outputParameterKey: model_info
-                producerTask: train-tabular
-            vision_model:
-              taskOutputParameter:
-                outputParameterKey: model_info
-                producerTask: train-vision
         taskInfo:
-          name: deploy
-      preprocess:
+          name: deploy-models
+      preprocess-data:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-preprocess
+          name: comp-preprocess-data
         inputs:
           parameters:
             bucket_name:
@@ -265,20 +374,21 @@ root:
             vision_data:
               componentInputParameter: vision_dataset_uri
         taskInfo:
-          name: preprocess
-      train-tabular:
+          name: preprocess-data
+      train-tabular-model:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-train-tabular
+          name: comp-train-tabular-model
         dependentTasks:
-        - preprocess
+        - preprocess-data
         inputs:
-          parameters:
+          artifacts:
             dataset:
-              taskOutputParameter:
-                outputParameterKey: tabular_dataset
-                producerTask: preprocess
+              taskOutputArtifact:
+                outputArtifactKey: tabular_dataset
+                producerTask: preprocess-data
+          parameters:
             min_accuracy:
               componentInputParameter: min_accuracy
             project_id:
@@ -286,20 +396,21 @@ root:
             region:
               componentInputParameter: region
         taskInfo:
-          name: train-tabular
-      train-vision:
+          name: train-tabular-model
+      train-vision-model:
         cachingOptions:
           enableCache: true
         componentRef:
-          name: comp-train-vision
+          name: comp-train-vision-model
         dependentTasks:
-        - preprocess
+        - preprocess-data
         inputs:
-          parameters:
+          artifacts:
             dataset:
-              taskOutputParameter:
-                outputParameterKey: vision_dataset
-                producerTask: preprocess
+              taskOutputArtifact:
+                outputArtifactKey: vision_dataset
+                producerTask: preprocess-data
+          parameters:
             min_accuracy:
               componentInputParameter: min_accuracy
             project_id:
@@ -307,7 +418,7 @@ root:
             region:
               componentInputParameter: region
         taskInfo:
-          name: train-vision
+          name: train-vision-model
   inputDefinitions:
     parameters:
       bucket_name:
