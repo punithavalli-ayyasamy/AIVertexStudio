@@ -1,17 +1,27 @@
-# Core build dependencies
-setuptools==65.5.1
-wheel==0.40.0
+# Core dependencies
+protobuf>=3.20.2,<4.0.0dev
+pydantic>=2.0.0,<3.0.0
+setuptools>=65.5.1
+wheel>=0.40.0
 
 # GCP dependencies
-google-cloud-aiplatform>=1.25.0
-google-cloud-storage>=2.10.0
+google-cloud-storage>=1.32.0,<3.0.0
+google-cloud-datastore==1.15.5
+google-cloud-aiplatform==1.104.0
+google-cloud-bigquery<3.0.0
+google-genai>=1.25.0
 
 # ML Pipeline dependencies
-kfp==1.8.22
-kfp-pipeline-spec==0.2.2
-kfp-server-api==2.0.0
+kfp>=2.0.0
 
-# Data processing
-pandas>=1.5.0
-pillow>=9.0.0
-numpy>=1.23.0
+# Data processing & ML
+pandas
+numpy
+pillow
+scikit-learn
+tensorflow
+
+# Authentication
+google-auth
+google-auth-httplib2
+google-api-python-client
