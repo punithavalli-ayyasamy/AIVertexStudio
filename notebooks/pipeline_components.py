@@ -8,13 +8,13 @@ import json
 import os
 
 @component(
-    base_image="python:3.9",
+    base_image="python:3.10",
     packages_to_install=[
-        "google-cloud-storage==2.9.0",
-        "pandas==2.0.3",
-        "numpy==1.24.3",
-        "pillow==10.0.0",
-        "protobuf<4.0.0dev"
+        "google-cloud-storage",
+        "pandas",
+        "numpy",
+        "pillow",
+        "protobuf"
     ]
 )
 def preprocess_data(vision_data: str, tabular_data: str, bucket_name: str) -> tuple[str, str]:
@@ -64,9 +64,9 @@ def preprocess_data(vision_data: str, tabular_data: str, bucket_name: str) -> tu
     return vision_output_uri, tabular_output_uri
 
 @component(
-    base_image="python:3.9",
+    base_image="python:3.10",
     packages_to_install=[
-        "google-cloud-aiplatform>=1.25.0"
+        "google-cloud-aiplatform"
     ]
 )
 def train_vision_model(project_id: str, region: str, dataset: str, min_accuracy: float) -> dict:
@@ -126,9 +126,9 @@ def train_vision_model(project_id: str, region: str, dataset: str, min_accuracy:
     return model_info
 
 @component(
-    base_image="python:3.9",
+    base_image="python:3.10",
     packages_to_install=[
-        "google-cloud-aiplatform>=1.25.0"
+        "google-cloud-aiplatform"
     ]
 )
 def train_tabular_model(project_id: str, region: str, dataset: str, min_accuracy: float) -> dict:
@@ -195,9 +195,9 @@ def train_tabular_model(project_id: str, region: str, dataset: str, min_accuracy
     return model_info
 
 @component(
-    base_image="python:3.9",
+    base_image="python:3.10",
     packages_to_install=[
-        "google-cloud-aiplatform>=1.25.0"
+        "google-cloud-aiplatform"
     ]
 )
 def deploy_models(project_id: str, region: str, vision_model: dict, tabular_model: dict) -> tuple[str, str]:
