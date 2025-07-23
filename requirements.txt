@@ -1,6 +1,6 @@
 # Core dependencies
 protobuf==3.20.3
-pydantic==2.5.3
+pydantic==1.10.13
 setuptools==69.0.3
 wheel==0.42.0
 
@@ -14,7 +14,8 @@ google-genai==0.3.0
 # ML Pipeline dependencies
 kfp==1.8.22
 kfp-server-api==1.8.22
-kfp-pipeline-spec==0.1.14
+kfp-pipeline-spec==0.1.16
+kubernetes==25.3.0
 
 # Data processing & ML
 pandas==2.1.4
@@ -26,4 +27,4 @@ tensorflow==2.15.0
 # Authentication
 google-auth==2.27.0
 google-auth-httplib2==0.1.1
-google-api-python-client==2.117.0
+google-api-python-client==1.12.11
