@@ -1,0 +1,109 @@
+@startuml
+!theme plain
+
+skinparam backgroundColor transparent
+skinparam componentStyle rectangle
+
+package "External Vendor Data Sources" {
+  [On-Demand API] as VDS1 #e6f3ff
+  [FTP, File] as VDS2 #e6f3ff
+  [Streaming] as VDS3 #e6f3ff
+}
+
+package "Data Sourcing & Ingestion" {
+  [Data Sourcing Platform] as DSP #f5f5f5
+  package "Ingestion Flows" {
+    [Full Ingestion &\nScheduled Delta Ingestion\nfor persistent data] as ING1 #lightgreen
+    [On-demand Sourcing\nfor non-persistent data] as ING2
+    [On-demand Sourcing\nfor persistent data] as ING3
+  }
+}
+
+package "Core Vendor Data Platform" {
+  scale 3
+  package "Data Persistence" {
+    [Elasticsearch\n(Vendor Attributes used in\nMatching & Scoring)] as ELASTIC #e9fce9
+    [MongoDB\n(Cluster data like matching,kitemarking\nand other vendor attributes\nused in search only)] as MONGODB #e9fce9
+    [Doc-Facade\n(Persist documents)] as DocFacade #e9fce9
+   
+  }
+  
+  package "Data Processing Pipeline" {
+   
+    [Matching Engine] as MATCHING #fff8e6
+    [Kitemarking Flow] as KM #fff8e6
+    [Drool Engine] as DROOL #fff8e6
+   
+  }
+
+  package "API/Kafka" {
+   
+    [Vendor Search] as VSAPI #e6f3ff
+    [Broadcast Vendor Data using Kafka topic] as BVSKAFKA #e6f3ff
+    [Vendor Serach and scoring (Streaming API )] as VSSAPI #e6f3ff
+    [KiteMarking Search] as KSAPI #e6f3ff
+    [Vendor Search/DataPoint] as VSDPAPI #e6f3ff
+ 
+}
+}
+
+package "Business/Consumer Systems" {
+  [Auto KYC based on DataPoint] as AUTOKYCCON #fff0f5
+  [Regulatory] as RRCON #fff0f5
+  [Search for Create/Update Golden Source] as CREUPCON #fff0f5
+  [AttributeLevel KYC] as ALKYCCON #fff0f5
+  [Vendor Search] as VSCON #fff0f5
+  [Vendor Search & Scoring] as VSCON #fff0f5
+  [Workflow] as ClientWorkflow #fff0f5
+  [Matching] as ClientMatching #fff0f5
+
+}
+
+' Data flows
+VDS1 -[#0066cc]-> DSP 
+VDS2 -[#0066cc]-> DSP 
+VDS3 -[#0066cc]-> DSP 
+DSP -[#ff9900]-> ING1 : Ingestion Trigger
+DSP -[#ff9900]-> ING2 : On-demand API Call
+
+ING1 -[#009900]-> ELASTIC : <size:8>Data used for Matching</size>
+ING3 -[#009900]-> ELASTIC :<size:8> Data used for Matching</size>
+ING1 -[#009900]-> MONGODB : <size:8>Data used for Searching</size>
+ING2 -[#ff6600]-> VSAPI : <size:10>Non-Persistent Data</size>
+
+
+ELASTIC -[#ff6600]-> BVSKAFKA : Data Change
+BVSKAFKA -[#009900]-> RRCON : Broadcast Update
+
+VSAPI -[#ff6600]-> VSCON : Search Request
+
+ELASTIC -[#ff6600]-> MATCHING : Find Possible matches using Fuzzy/Scoring
+MATCHING -[#ff6600]-> DROOL : Find Precision match using Business ruls
+MATCHING -[#ff6600]-> KM
+MATCHING -[#ff6600]-> MONGODB : Persist cluster
+
+
+KM -[#ff6600]-> MONGODB : Persist cluster
+
+KSAPI -[#ff6600]-> ALKYCCON : Search Request
+
+AUTOKYCCON -[#ff6600]-> VSDPAPI
+VSDPAPI -[#ff6600]-> ING3 : Request Data/Document
+ING3 -[#ff6600]-> ELASTIC : Ingest for Data Processing
+ELASTIC -[#ff6600]-> "Data Processing Pipeline"
+"Data Processing Pipeline" -[#ff6600]-> VSDPAPI : Response DataPoint
+ING3 -[#ff6600]-> DocFacade : Persistent Document
+DocFacade -[#ff6600]-> VSDPAPI : Response Document
+
+CREUPCON -[#ff6600]-> VSAPI 
+VSAPI -[#ff6600]-> ELASTIC : Search Request
+
+ALKYCCON -[#ff6600]-> KSAPI 
+KSAPI -[#ff6600]-> KM : Search Request
+
+VSCON -[#ff6600]-> VSSAPI 
+VSSAPI -[#ff6600]-> MATCHING : Vendor Data & Matching Score Search
+VSCON -[#color,dotted]-> ClientWorkflow
+VSCON -[#color,dotted]-> ClientMatching
+
+@enduml
