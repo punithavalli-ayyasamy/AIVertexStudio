@@ -1,0 +1,139 @@
+graph TD
+    subgraph "External Vendor Data Sources"
+        direction LR
+        VDS1[Vendor Source 1<br>(e.g., Paid API)]
+        VDS2[Vendor Source 2<br>(e.g., FTP, File)]
+        VDS3[Vendor Source 3<br>(e.g., Paid API)]
+    end
+
+    subgraph "Data Sourcing & Ingestion"
+        direction LR
+        DSP[Data Sourcing Platform]
+        subgraph "Ingestion Flows"
+            direction TB
+            ING1[Full & Delta Ingestion<br>for persistent data]
+            ING2[On-demand Sourcing<br>for non-persistent data]
+        end
+        
+        VDS1 -- Paid API Call & Cost Monitoring --> DSP
+        VDS2 -- File Ingestion --> DSP
+        VDS3 -- Paid API Call & Cost Monitoring --> DSP
+        
+        DSP -- Ingestion Trigger --> ING1
+        DSP -- On-demand API Call --> ING2
+    end
+    
+    subgraph "Core Vendor Data Platform"
+        direction TB
+        subgraph "Data Persistence & Processing"
+            ELASTIC[Elasticsearch Index<br>(Persisted Data)]
+            MONGODB[MongoDB<br>(Internal Golden Data)]
+            
+            ING1 -- Persist Data --> ELASTIC
+            ELASTIC -- Trigger Matching --> MAT
+            
+            subgraph "Matching & Scoring"
+                MAT[Matching Engine]
+                MAT -- Score Output --> CON[Consumer]
+                MAT -- Match against --> MONGODB
+            end
+        end
+        
+        subgraph "Business Workflows & Services"
+            VS[Vendor Search & Matching Service]
+            KM[Kitemarking Flow]
+            BVS[Broadcast Vendor Data Service]
+
+            CON -- Create / Update / Trigger Workflow --> WF[Workflow Engine]
+            CON -- Search Request --> VS
+            VS -- Matched Results --> CON
+            MAT -- Match Decision --> KM
+            KM -- Kitemark Status --> CON
+            ELASTIC -- Data Change --> BVS
+            BVS -- Broadcast Update --> CON
+        end
+    end
+    
+    subgraph "Consumer Systems"
+        direction TB
+        CON[Consumer Systems<br>(e.g., Auto KYC, Regulatory Reporting)]
+    end
+
+    subgraph "Data Flows and Actions"
+        direction TB
+        ING2 -- Non-Persistent Data --> CON
+        CON -- Search/Query --> VS
+        CON -- Demand Call --> ING2
+    end
+    
+    style VDS1 fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#000
+    style VDS2 fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#000
+    style VDS3 fill:#e6f3ff,stroke:#0066cc,stroke-width:2px,color:#000
+    style ELASTIC fill:#e9fce9,stroke:#009900,stroke-width:2px,color:#000
+    style MONGODB fill:#e9fce9,stroke:#009900,stroke-width:2px,color:#000
+    style MAT fill:#fff8e6,stroke:#ff9900,stroke-width:2px,color:#000
+    style KM fill:#fff8e6,stroke:#ff9900,stroke-width:2px,color:#000
+    style BVS fill:#fff8e6,stroke:#ff9900,stroke-width:2px,color:#000
+    style DSP fill:#f5f5f5,stroke:#999,stroke-width:2px,color:#000
+    style VS fill:#f5f5f5,stroke:#999,stroke-width:2px,color:#000
+    style CON fill:#ccffff,stroke:#003366,stroke-width:2px,color:#000
+    style WF fill:#fff0f5,stroke:#cc0066,stroke-width:2px,color:#000
+    
+    VDS1[Vendor Source 1 (Paid API)]
+    VDS2[Vendor Source 2 (File)]
+    VDS3[Vendor Source 3 (Paid API)]
+    DSP[Data Sourcing Platform]
+    ING1[Full & Delta Ingestion]
+    ING2[On-demand Sourcing]
+    ELASTIC[Elasticsearch (Persisted Vendor Data)]
+    MONGODB[MongoDB (Internal Golden Data)]
+    MAT[Matching Engine]
+    KM[Kitemarking Flow]
+    BVS[Broadcast Service]
+    VS[Vendor Search Service]
+    WF[Workflow Engine]
+    CON[Consumer Systems]
+    
+    VDS1 -->|Paid API Call| DSP
+    VDS2 -->|File Ingestion| DSP
+    VDS3 -->|Paid API Call| DSP
+    DSP -->|Scheduled/Triggered Ingestion| ING1
+    DSP -->|On-demand API Call| ING2
+    
+    ING1 -->|Persist Data| ELASTIC
+    ING2 -->|Send directly| CON
+    
+    ELASTIC -->|Data Change| BVS
+    BVS -->|Broadcast Update| CON
+    
+    CON -->|Search Request| VS
+    VS -->|Query| ELASTIC
+    ELASTIC -->|Search Results| VS
+    VS -->|Display Results| CON
+    
+    ELASTIC -->|Trigger Matching| MAT
+    MAT -->|Match against| MONGODB
+    MAT -->|Output Score & Match Decision| CON
+    MAT -->|Match Decision| KM
+    KM -->|Kitemark Status| CON
+    
+    CON -->|Trigger Workflow| WF
+    
+    linkStyle 0 stroke:#0066cc,stroke-width:2px;
+    linkStyle 1 stroke:#0066cc,stroke-width:2px;
+    linkStyle 2 stroke:#0066cc,stroke-width:2px;
+    linkStyle 3 stroke:#ff9900,stroke-width:2px;
+    linkStyle 4 stroke:#ff9900,stroke-width:2px;
+    linkStyle 5 stroke:#009900,stroke-width:2px;
+    linkStyle 6 stroke:#ff6600,stroke-width:2px;
+    linkStyle 7 stroke:#ff6600,stroke-width:2px;
+    linkStyle 8 stroke:#009900,stroke-width:2px;
+    linkStyle 9 stroke:#0066cc,stroke-width:2px;
+    linkStyle 10 stroke:#ff9900,stroke-width:2px;
+    linkStyle 11 stroke:#ff6600,stroke-width:2px;
+    linkStyle 12 stroke:#ff9900,stroke-width:2px;
+    linkStyle 13 stroke:#ff9900,stroke-width:2px;
+    linkStyle 14 stroke:#009900,stroke-width:2px;
+    linkStyle 15 stroke:#ff6600,stroke-width:2px;
+    linkStyle 16 stroke:#ff6600,stroke-width:2px;
+    linkStyle 17 stroke:#cc0066,stroke-width:2px;
